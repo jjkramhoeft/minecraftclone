@@ -33,6 +33,15 @@ public class TextureAtlas
         DrawWoodTop(pixels);
         DrawLeaves(pixels);
         DrawSpeckled(pixels, BlockInfo.TileWater, new Color(58, 110, 216), 10);
+        DrawPlanks(pixels);
+        DrawBricks(pixels);
+        DrawStick(pixels);
+        DrawTool(pixels, BlockInfo.TileWoodenPickaxe, WoodHeadColor, ToolShape.Pickaxe);
+        DrawTool(pixels, BlockInfo.TileStonePickaxe, StoneHeadColor, ToolShape.Pickaxe);
+        DrawTool(pixels, BlockInfo.TileWoodenAxe, WoodHeadColor, ToolShape.Axe);
+        DrawTool(pixels, BlockInfo.TileStoneAxe, StoneHeadColor, ToolShape.Axe);
+        DrawTool(pixels, BlockInfo.TileWoodenShovel, WoodHeadColor, ToolShape.Shovel);
+        DrawTool(pixels, BlockInfo.TileStoneShovel, StoneHeadColor, ToolShape.Shovel);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -123,6 +132,105 @@ public class TextureAtlas
                 int ring = Math.Max(Math.Abs(x * 2 - 15), Math.Abs(y * 2 - 15)) / 2;
                 SetPixel(pixels, BlockInfo.TileWoodTop, x, y, Jitter(rng, ring % 2 == 0 ? light : dark, 7));
             }
+        }
+    }
+
+    private static void DrawPlanks(Color[] pixels)
+    {
+        var rng = RngFor(BlockInfo.TilePlanks);
+        var baseColor = new Color(168, 132, 84);
+        var seam = new Color(110, 84, 50);
+        for (int y = 0; y < TileSize; y++)
+        {
+            bool seamRow = y % 4 == 3;
+            // Vertical plank-end joints, staggered per row band.
+            int jointX = (y / 4 * 7 + 3) % TileSize;
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, BlockInfo.TilePlanks, x, y,
+                    seamRow || x == jointX ? seam : Jitter(rng, baseColor, 8));
+        }
+    }
+
+    private static void DrawBricks(Color[] pixels)
+    {
+        var rng = RngFor(BlockInfo.TileBricks);
+        var brick = new Color(146, 60, 48);
+        var mortar = new Color(180, 172, 162);
+        for (int y = 0; y < TileSize; y++)
+        {
+            bool mortarRow = y % 4 == 3;
+            int offset = y / 4 % 2 == 0 ? 0 : 4; // running bond stagger
+            for (int x = 0; x < TileSize; x++)
+            {
+                bool mortarColumn = (x + offset) % 8 == 7;
+                SetPixel(pixels, BlockInfo.TileBricks, x, y,
+                    mortarRow || mortarColumn ? mortar : Jitter(rng, brick, 10));
+            }
+        }
+    }
+
+    private static readonly Color HandleColor = new(102, 81, 50);
+    private static readonly Color WoodHeadColor = new(168, 132, 84);
+    private static readonly Color StoneHeadColor = new(125, 125, 125);
+
+    private enum ToolShape { Pickaxe, Axe, Shovel }
+
+    /// <summary>UI-only icons: a diagonal handle with a head shape at the top
+    /// end, on a transparent background.</summary>
+    private static void DrawTool(Color[] pixels, int tile, Color head, ToolShape shape)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Color.Transparent);
+
+        // Handle from bottom-left to upper-right, 2 px thick.
+        for (int i = 0; i < 10; i++)
+        {
+            SetPixel(pixels, tile, 3 + i, 13 - i, HandleColor);
+            SetPixel(pixels, tile, 4 + i, 13 - i, HandleColor);
+        }
+
+        switch (shape)
+        {
+            case ToolShape.Pickaxe:
+                // Arced head across the top, drooping at both ends.
+                for (int x = 4; x <= 12; x++)
+                {
+                    SetPixel(pixels, tile, x, 2, head);
+                    SetPixel(pixels, tile, x, 3, head);
+                }
+                for (int d = 0; d < 3; d++)
+                {
+                    SetPixel(pixels, tile, 3, 3 + d, head);
+                    SetPixel(pixels, tile, 13, 3 + d, head);
+                }
+                break;
+            case ToolShape.Axe:
+                // Blade hanging off the left side of the handle's top end.
+                for (int y = 1; y <= 6; y++)
+                    for (int x = 7; x <= 11; x++)
+                        if (x + y <= 15)
+                            SetPixel(pixels, tile, x, y, head);
+                break;
+            case ToolShape.Shovel:
+                // Rounded blade capping the handle's top end.
+                for (int y = 0; y <= 4; y++)
+                    for (int x = 10; x <= 14; x++)
+                        if (!((x == 10 || x == 14) && (y == 0 || y == 4)))
+                            SetPixel(pixels, tile, x, y, head);
+                break;
+        }
+    }
+
+    private static void DrawStick(Color[] pixels)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, BlockInfo.TileStick, x, y, Color.Transparent);
+        for (int i = 0; i < 10; i++)
+        {
+            SetPixel(pixels, BlockInfo.TileStick, 3 + i, 12 - i, HandleColor);
+            SetPixel(pixels, BlockInfo.TileStick, 4 + i, 12 - i, HandleColor);
         }
     }
 

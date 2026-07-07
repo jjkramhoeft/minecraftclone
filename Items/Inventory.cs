@@ -104,6 +104,11 @@ public class Inventory
         return true;
     }
 
+    /// <summary>Copy of all slots, for all-or-nothing operations (crafting rollback).</summary>
+    public ItemStack[] SnapshotSlots() => (ItemStack[])_slots.Clone();
+
+    public void RestoreSlots(ItemStack[] snapshot) => snapshot.CopyTo(_slots, 0);
+
     /// <summary>Removes one item from a specific slot (e.g. placing from the hand).</summary>
     public void ConsumeFromSlot(int slot, int count = 1)
     {

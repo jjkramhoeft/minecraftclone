@@ -60,7 +60,16 @@ public static class ItemInfo
     {
         if (TryGetBlock(item, out var block))
             return BlockInfo.GetFaceTile(block, BlockFace.South);
-        // Non-block items get dedicated tiles when they become craftable (Phase 2/3).
-        return BlockInfo.TileDirt;
+        return item switch
+        {
+            ItemType.Stick => BlockInfo.TileStick,
+            ItemType.WoodenPickaxe => BlockInfo.TileWoodenPickaxe,
+            ItemType.StonePickaxe => BlockInfo.TileStonePickaxe,
+            ItemType.WoodenAxe => BlockInfo.TileWoodenAxe,
+            ItemType.StoneAxe => BlockInfo.TileStoneAxe,
+            ItemType.WoodenShovel => BlockInfo.TileWoodenShovel,
+            ItemType.StoneShovel => BlockInfo.TileStoneShovel,
+            _ => BlockInfo.TileDirt,
+        };
     }
 }

@@ -15,6 +15,9 @@ public class InventoryScreen
 {
     private const int SlotPadding = 4;
     private const int HotbarGap = 14; // visual separation between storage rows and the hotbar row
+    private const int RecipePanelWidth = 216;
+    private const int RecipeRowHeight = 30;
+    private const int RecipeIconSize = 24;
 
     private readonly Texture2D _pixel;
     private readonly Inventory _inventory;
@@ -46,6 +49,16 @@ public class InventoryScreen
         bool click = mouse.LeftButton == ButtonState.Pressed && previousMouse.LeftButton == ButtonState.Released;
         if (!click)
             return;
+
+        for (int i = 0; i < Recipes.All.Length; i++)
+        {
+            if (GetRecipeRowRect(i, screenWidth, screenHeight).Contains(mouse.Position))
+            {
+                if (_held.IsEmpty) // don't craft with a lifted stack — it isn't counted
+                    Recipes.TryCraft(Recipes.All[i], _inventory);
+                return;
+            }
+        }
 
         for (int slot = 0; slot < Inventory.Size; slot++)
         {
@@ -97,6 +110,8 @@ public class InventoryScreen
                 slot == _inventory.SelectedIndex);
         }
 
+        DrawRecipes(spriteBatch, atlas, font, screenWidth, screenHeight);
+
         if (!_held.IsEmpty)
         {
             var heldRect = new Rectangle(mouse.X - SlotRenderer.SlotSize / 2, mouse.Y - SlotRenderer.SlotSize / 2,
@@ -107,11 +122,64 @@ public class InventoryScreen
         spriteBatch.End();
     }
 
+    private void DrawRecipes(SpriteBatch spriteBatch, TextureAtlas atlas, PixelFont font, int screenWidth, int screenHeight)
+    {
+        for (int i = 0; i < Recipes.All.Length; i++)
+        {
+            var recipe = Recipes.All[i];
+            var row = GetRecipeRowRect(i, screenWidth, screenHeight);
+            bool affordable = Recipes.CanAfford(recipe, _inventory);
+            var tint = affordable ? Color.White : new Color(255, 255, 255, 70);
+
+            spriteBatch.Draw(_pixel, row, new Color(0, 0, 0, affordable ? 150 : 60));
+
+            // Output: icon xN, then a gap, then each input icon xN.
+            int x = row.X + 4;
+            int iconY = row.Y + (row.Height - RecipeIconSize) / 2;
+            DrawItemIcon(spriteBatch, atlas, recipe.Output.Item, new Rectangle(x, iconY, RecipeIconSize, RecipeIconSize), tint);
+            x += RecipeIconSize + 1;
+            if (recipe.Output.Count > 1)
+            {
+                font.Draw(spriteBatch, "x" + recipe.Output.Count, x, row.Y + row.Height / 2 - PixelFont.GlyphHeight, 2, tint);
+                x += PixelFont.MeasureWidth("x" + recipe.Output.Count, 2);
+            }
+            x += 14;
+
+            foreach (var (item, count) in recipe.Inputs)
+            {
+                DrawItemIcon(spriteBatch, atlas, item, new Rectangle(x, iconY, RecipeIconSize, RecipeIconSize), tint);
+                x += RecipeIconSize + 1;
+                font.Draw(spriteBatch, "x" + count, x, row.Y + row.Height / 2 - PixelFont.GlyphHeight, 2, tint);
+                x += PixelFont.MeasureWidth("x" + count, 2) + 6;
+            }
+        }
+    }
+
+    private static void DrawItemIcon(SpriteBatch spriteBatch, TextureAtlas atlas, ItemType item, Rectangle rect, Color tint)
+    {
+        int tile = ItemInfo.GetIconTile(item);
+        var source = new Rectangle(
+            tile % TextureAtlas.TilesPerRow * TextureAtlas.TileSize,
+            tile / TextureAtlas.TilesPerRow * TextureAtlas.TileSize,
+            TextureAtlas.TileSize, TextureAtlas.TileSize);
+        spriteBatch.Draw(atlas.Texture, rect, source, tint);
+    }
+
     private static Rectangle GetPanelRect(int screenWidth, int screenHeight)
     {
-        int width = Inventory.Columns * (SlotRenderer.SlotSize + SlotPadding) - SlotPadding + 32;
-        int height = Inventory.Rows * (SlotRenderer.SlotSize + SlotPadding) - SlotPadding + HotbarGap + 32;
+        int width = Inventory.Columns * (SlotRenderer.SlotSize + SlotPadding) - SlotPadding + RecipePanelWidth + 48;
+        int gridHeight = Inventory.Rows * (SlotRenderer.SlotSize + SlotPadding) - SlotPadding + HotbarGap + 32;
+        int recipeHeight = Recipes.All.Length * (RecipeRowHeight + 4) + 28;
+        int height = System.Math.Max(gridHeight, recipeHeight);
         return new Rectangle((screenWidth - width) / 2, (screenHeight - height) / 2, width, height);
+    }
+
+    private static Rectangle GetRecipeRowRect(int index, int screenWidth, int screenHeight)
+    {
+        var panel = GetPanelRect(screenWidth, screenHeight);
+        int x = panel.Right - RecipePanelWidth - 16;
+        int y = panel.Y + 16 + index * (RecipeRowHeight + 4);
+        return new Rectangle(x, y, RecipePanelWidth, RecipeRowHeight);
     }
 
     /// <summary>Slots 6-23 are the three storage rows (top); slots 0-5 (the

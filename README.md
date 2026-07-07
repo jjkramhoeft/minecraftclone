@@ -12,6 +12,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **First-person movement** with gravity, jumping, collision, sprinting, swimming, and a free-fly mode
 - **Building and digging**: break any block, place grass, dirt, stone, sand, wood, or leaves
 - **Survival-lite inventory**: broken blocks drop items into a 24-slot inventory (`E` to open); placing consumes from the selected hotbar stack
+- **Crafting**: a recipe list in the inventory screen — wood into planks and sticks, sand into bricks, and wooden/stone tools
 - **Pixel-style textures** from a procedurally generated texture atlas
 - **Lighting look** from per-face directional shading plus per-vertex ambient occlusion
 - **Distance fog** blending the horizon into the sky
@@ -96,6 +97,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `ItemStack.cs` | An item type + count in a slot |
 | `ItemInfo.cs` | Per-item tables: block↔item mapping, stack sizes, tool class/tier, block drops, UI icons |
 | `Inventory.cs` | The player's 24 slots (6×4); slots 0–5 are the hotbar |
+| `Recipe.cs` | Shapeless recipes and all-or-nothing crafting with inventory rollback |
 
 ### `UI\` — 2D overlay
 
@@ -103,7 +105,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 |---|---|
 | `Hud.cs` | Crosshair |
 | `Hotbar.cs` | Selected-slot input (keys/scroll) and the hotbar strip, a view over inventory slots 0–5 |
-| `InventoryScreen.cs` | Full inventory overlay (`E`): click to lift/drop/merge/swap stacks |
+| `InventoryScreen.cs` | Full inventory overlay (`E`): click to lift/drop/merge/swap stacks, plus the click-to-craft recipe panel |
 | `SlotRenderer.cs` | Shared slot drawing (frame, item icon, stack count) |
 | `PixelFont.cs` | Tiny procedural bitmap font (digits) — the project has no SpriteFont/content pipeline |
 
