@@ -11,7 +11,7 @@ Each phase produces something runnable. Checked boxes are done.
 - [x] **Phase 2 — One chunk meshed**: 16×128×16 terrain chunk from a noise heightmap, culled meshing, per-face shading
 - [x] **Phase 3 — Infinite world**: chunks generate/mesh on background threads as you move, unload behind you, seamless borders
 - [x] **Phase 4 — Walking player**: gravity, jumping, AABB collision against the terrain (with a fly-mode debug toggle)
-- [ ] **Phase 5 — Break & place blocks**: DDA raycast from the crosshair, left-click break, right-click place, block highlight
+- [x] **Phase 5 — Break & place blocks**: DDA raycast from the crosshair, left-click break, right-click place, block highlight
 - [ ] **Phase 6 — Textures, block variety, hotbar**: procedural texture atlas; grass, dirt, stone, sand, wood, leaves; hotbar selection
 - [ ] **Phase 7 — Save & load**: modified chunks persist to disk, world seed + player position saved
 - [ ] **Phase 8 — Polish (optional)**: distance fog, frustum culling, water, ambient occlusion, sounds

@@ -20,6 +20,12 @@ public class Chunk
     /// <summary>True when the block data changed and the mesh needs rebuilding.</summary>
     public bool MeshDirty { get; set; }
 
+    /// <summary>
+    /// Bumped on every player edit. Background mesh results carry the version
+    /// they were built from, so a stale result never overwrites a newer mesh.
+    /// </summary>
+    public int Version { get; set; }
+
     private readonly byte[] _blocks = new byte[SizeX * SizeY * SizeZ];
 
     public Chunk(ChunkCoord coord) => Coord = coord;

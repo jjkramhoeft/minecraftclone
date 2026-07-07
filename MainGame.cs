@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using MinecraftClone.Player;
 using MinecraftClone.Rendering;
+using MinecraftClone.UI;
 using MinecraftClone.World;
 
 namespace MinecraftClone;
@@ -10,6 +11,7 @@ namespace MinecraftClone;
 public class MainGame : Game
 {
     private const int WorldSeed = 12345;
+    private const float Reach = 5f;
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
@@ -17,6 +19,11 @@ public class MainGame : Game
     private WorldRenderer _worldRenderer;
     private ChunkManager _chunkManager;
     private PlayerController _player;
+    private BlockHighlight _blockHighlight;
+    private Hud _hud;
+
+    private MouseState _previousMouse;
+    private RaycastHit? _targetedBlock;
 
     private double _titleTimer;
     private int _frames;
@@ -52,6 +59,8 @@ public class MainGame : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _worldRenderer = new WorldRenderer(GraphicsDevice);
         _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(WorldSeed));
+        _blockHighlight = new BlockHighlight(GraphicsDevice);
+        _hud = new Hud(GraphicsDevice);
     }
 
     protected override void Update(GameTime gameTime)
@@ -64,9 +73,47 @@ public class MainGame : Game
         UpdateMouseLook();
         _player.Update(keyboard, _camera, _chunkManager, dt);
         _camera.Position = _player.EyePosition;
+        UpdateBlockInteraction();
         _chunkManager.Update(_player.Position);
 
         base.Update(gameTime);
+    }
+
+    private void UpdateBlockInteraction()
+    {
+        var mouse = Mouse.GetState();
+        _targetedBlock = VoxelRaycaster.Cast(_chunkManager, _camera.Position, _camera.Forward, Reach, out var hit)
+            ? hit
+            : null;
+
+        if (IsActive && _mouseCaptured && _targetedBlock is { } target)
+        {
+            bool leftClick = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
+            bool rightClick = mouse.RightButton == ButtonState.Pressed && _previousMouse.RightButton == ButtonState.Released;
+
+            if (leftClick)
+            {
+                _chunkManager.SetBlock(target.X, target.Y, target.Z, BlockType.Air);
+            }
+            else if (rightClick && (target.NormalX != 0 || target.NormalY != 0 || target.NormalZ != 0))
+            {
+                int x = target.X + target.NormalX;
+                int y = target.Y + target.NormalY;
+                int z = target.Z + target.NormalZ;
+                if (_chunkManager.GetBlock(x, y, z) == BlockType.Air && !IntersectsPlayer(x, y, z))
+                    _chunkManager.SetBlock(x, y, z, BlockType.Dirt); // Phase 6 replaces with the hotbar selection
+            }
+        }
+
+        _previousMouse = mouse;
+    }
+
+    private bool IntersectsPlayer(int x, int y, int z)
+    {
+        var p = _player.Position;
+        return x + 1 > p.X - PlayerPhysics.HalfWidth && x < p.X + PlayerPhysics.HalfWidth
+            && y + 1 > p.Y && y < p.Y + PlayerPhysics.Height
+            && z + 1 > p.Z - PlayerPhysics.HalfWidth && z < p.Z + PlayerPhysics.HalfWidth;
     }
 
     private void UpdateMouseLook()
@@ -93,6 +140,9 @@ public class MainGame : Game
         GraphicsDevice.Clear(Color.CornflowerBlue);
 
         _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
+        if (_targetedBlock is { } target)
+            _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
+        _hud.Draw(_spriteBatch, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
 
         UpdateDebugTitle(gameTime);
         base.Draw(gameTime);

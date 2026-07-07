@@ -33,7 +33,7 @@ public class ChunkManager : IDisposable
     private readonly HashSet<ChunkCoord> _generating = new();
     private readonly HashSet<ChunkCoord> _meshing = new();
     private readonly ConcurrentQueue<Chunk> _generatedChunks = new();
-    private readonly ConcurrentQueue<(ChunkCoord Coord, MeshData Data)> _meshResults = new();
+    private readonly ConcurrentQueue<(ChunkCoord Coord, int Version, MeshData Data)> _meshResults = new();
 
     // All offsets within the generate radius, nearest first, so the terrain
     // around the player streams in before the horizon does.
@@ -73,6 +73,48 @@ public class ChunkManager : IDisposable
         return chunk.GetBlock(x & 15, y, z & 15);
     }
 
+    /// <summary>
+    /// Player edit: sets the block and rebuilds the affected mesh(es) immediately
+    /// on the main thread (&lt;2 ms for a chunk) so breaking/placing feels instant.
+    /// </summary>
+    public void SetBlock(int x, int y, int z, BlockType type)
+    {
+        if (y < 0 || y >= Chunk.SizeY)
+            return;
+        var coord = new ChunkCoord(x >> 4, z >> 4);
+        if (!_chunks.TryGetValue(coord, out var chunk))
+            return;
+
+        int localX = x & 15, localZ = z & 15;
+        chunk.SetBlock(localX, y, localZ, type);
+        chunk.IsModified = true;
+        chunk.Version++;
+
+        RemeshNow(coord);
+        // A border edit changes the neighbor's face culling too.
+        if (localX == 0) RemeshNow(new ChunkCoord(coord.X - 1, coord.Z));
+        if (localX == Chunk.SizeX - 1) RemeshNow(new ChunkCoord(coord.X + 1, coord.Z));
+        if (localZ == 0) RemeshNow(new ChunkCoord(coord.X, coord.Z - 1));
+        if (localZ == Chunk.SizeZ - 1) RemeshNow(new ChunkCoord(coord.X, coord.Z + 1));
+    }
+
+    private void RemeshNow(ChunkCoord coord)
+    {
+        if (!_chunks.TryGetValue(coord, out var chunk))
+            return;
+        if (!TryGetNeighbors(coord, out var neighbors))
+        {
+            chunk.MeshDirty = true; // the async path picks it up once neighbors exist
+            return;
+        }
+
+        var data = ChunkMesher.Build(chunk, neighbors.Sample);
+        if (_meshes.Remove(coord, out var oldMesh))
+            oldMesh.Dispose();
+        _meshes[coord] = new ChunkMesh(_device, coord, data);
+        chunk.MeshDirty = false;
+    }
+
     private void IntegrateGeneratedChunks()
     {
         int budget = GenerateIntegrationsPerFrame;
@@ -89,8 +131,10 @@ public class ChunkManager : IDisposable
         while (budget-- > 0 && _meshResults.TryDequeue(out var result))
         {
             _meshing.Remove(result.Coord);
-            if (!_chunks.ContainsKey(result.Coord))
+            if (!_chunks.TryGetValue(result.Coord, out var chunk))
                 continue; // chunk was unloaded while its mesh was being built
+            if (chunk.Version != result.Version)
+                continue; // edited while meshing — a newer synchronous mesh exists
 
             if (_meshes.Remove(result.Coord, out var oldMesh))
                 oldMesh.Dispose();
@@ -124,10 +168,11 @@ public class ChunkManager : IDisposable
             {
                 _meshing.Add(coord);
                 loaded.MeshDirty = false;
+                int version = loaded.Version;
                 Task.Run(() =>
                 {
                     var data = ChunkMesher.Build(loaded, neighbors.Sample);
-                    _meshResults.Enqueue((loaded.Coord, data));
+                    _meshResults.Enqueue((loaded.Coord, version, data));
                 });
             }
         }
