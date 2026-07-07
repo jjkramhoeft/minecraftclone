@@ -15,7 +15,10 @@ public class MainGame : Game
     private SpriteBatch _spriteBatch;
     private FirstPersonCamera _camera;
     private WorldRenderer _worldRenderer;
-    private ChunkMesh _chunkMesh;
+    private ChunkManager _chunkManager;
+
+    private double _titleTimer;
+    private int _frames;
 
     // False whenever the window lost focus, so the first recentering of the
     // mouse doesn't register as a huge look delta.
@@ -35,9 +38,9 @@ public class MainGame : Game
     {
         _camera = new FirstPersonCamera
         {
-            Position = new Vector3(8f, 68f, -14f), // above and south of the chunk, looking in
+            Position = new Vector3(8f, 75f, 8f), // above the terrain at the origin
             Yaw = 0f,
-            Pitch = -0.5f,
+            Pitch = -0.35f,
         };
         _camera.UpdateProjection(GraphicsDevice.Viewport.AspectRatio);
 
@@ -48,13 +51,7 @@ public class MainGame : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _worldRenderer = new WorldRenderer(GraphicsDevice);
-
-        // Phase 2: a single chunk at the origin. Phase 3 moves this into ChunkManager.
-        var generator = new TerrainGenerator(WorldSeed);
-        var chunk = new Chunk(new ChunkCoord(0, 0));
-        generator.Generate(chunk);
-        var meshData = ChunkMesher.Build(chunk, (x, y, z) => BlockType.Air);
-        _chunkMesh = new ChunkMesh(GraphicsDevice, chunk.Coord, meshData);
+        _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(WorldSeed));
     }
 
     protected override void Update(GameTime gameTime)
@@ -66,6 +63,7 @@ public class MainGame : Game
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         UpdateMouseLook();
         UpdateFlyMovement(keyboard, dt);
+        _chunkManager.Update(_camera.Position);
 
         base.Update(gameTime);
     }
@@ -107,8 +105,28 @@ public class MainGame : Game
     {
         GraphicsDevice.Clear(Color.CornflowerBlue);
 
-        _worldRenderer.Draw(GraphicsDevice, _camera, new[] { _chunkMesh });
+        _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
 
+        UpdateDebugTitle(gameTime);
         base.Draw(gameTime);
+    }
+
+    private void UpdateDebugTitle(GameTime gameTime)
+    {
+        _frames++;
+        _titleTimer += gameTime.ElapsedGameTime.TotalSeconds;
+        if (_titleTimer < 1.0)
+            return;
+
+        var pos = _camera.Position;
+        Window.Title = $"Minecraft Clone — {_frames} fps | {_chunkManager.LoadedChunkCount} chunks ({_chunkManager.PendingCount} pending) | {pos.X:0.#}, {pos.Y:0.#}, {pos.Z:0.#}";
+        _frames = 0;
+        _titleTimer = 0;
+    }
+
+    protected override void UnloadContent()
+    {
+        _chunkManager.Dispose();
+        base.UnloadContent();
     }
 }
