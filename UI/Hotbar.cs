@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -32,6 +33,8 @@ public class Hotbar
 
     public int SelectedIndex { get; private set; }
     public BlockType SelectedBlock => Slots[SelectedIndex];
+
+    public void Select(int index) => SelectedIndex = Math.Clamp(index, 0, Slots.Length - 1);
 
     public Hotbar(GraphicsDevice device)
     {

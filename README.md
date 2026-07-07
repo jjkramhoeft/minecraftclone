@@ -13,7 +13,7 @@ Each phase produces something runnable. Checked boxes are done.
 - [x] **Phase 4 — Walking player**: gravity, jumping, AABB collision against the terrain (with a fly-mode debug toggle)
 - [x] **Phase 5 — Break & place blocks**: DDA raycast from the crosshair, left-click break, right-click place, block highlight
 - [x] **Phase 6 — Textures, block variety, hotbar**: procedural texture atlas; grass, dirt, stone, sand, wood, leaves; hotbar selection
-- [ ] **Phase 7 — Save & load**: modified chunks persist to disk, world seed + player position saved
+- [x] **Phase 7 — Save & load**: modified chunks persist to disk, world seed + player position saved
 - [ ] **Phase 8 — Polish (optional)**: distance fog, frustum culling, water, ambient occlusion, sounds
 
 ## Controls (planned)
@@ -72,10 +72,12 @@ Load-bearing design decisions (so future-me doesn't relitigate them):
 
 ## Save format
 
-Saves live in `saves\default\` next to the executable:
+Saves live in `saves\default\` relative to the working directory (next to the executable when launching the exe directly, or in the project root under `dotnet run`/F5):
 
-- `world.json` — seed, format version, player position/rotation, selected hotbar slot
-- `chunks\c_{x}_{z}.bin` — one file per *modified* chunk: small header (magic, version, chunk coordinate) followed by the raw 32 KB block array behind a `GZipStream`
+- `world.json` — seed, format version, player position/rotation, selected hotbar slot, fly mode
+- `chunks\c_{x}_{z}.bin` — one file per *modified* chunk: small header (magic, version, chunk coordinate) followed by the raw 32 KB block array behind a `GZipStream` (~1-3 KB on disk)
+
+Saving happens automatically when chunks unload and when the game exits; `F5` forces a full save. Delete the `saves` folder for a fresh world.
 
 ## Non-goals
 

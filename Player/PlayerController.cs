@@ -30,7 +30,11 @@ public class PlayerController
 
     public Vector3 EyePosition => Position + new Vector3(0f, EyeHeight, 0f);
 
-    public PlayerController(Vector3 spawnPosition) => Position = spawnPosition;
+    public PlayerController(Vector3 spawnPosition, bool isFlying = false)
+    {
+        Position = spawnPosition;
+        IsFlying = isFlying;
+    }
 
     public void Update(KeyboardState keyboard, FirstPersonCamera camera, ChunkManager world, float dt)
     {

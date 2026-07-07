@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using MinecraftClone.Persistence;
 using MinecraftClone.Player;
 using MinecraftClone.Rendering;
 using MinecraftClone.UI;
@@ -10,7 +11,7 @@ namespace MinecraftClone;
 
 public class MainGame : Game
 {
-    private const int WorldSeed = 12345;
+    private const int DefaultSeed = 12345;
     private const float Reach = 5f;
 
     private GraphicsDeviceManager _graphics;
@@ -24,7 +25,12 @@ public class MainGame : Game
     private TextureAtlas _atlas;
     private Hotbar _hotbar;
 
+    private WorldSave _worldSave;
+    private int _seed;
+    private int _savedHotbarIndex;
+
     private MouseState _previousMouse;
+    private KeyboardState _previousKeyboard;
     private RaycastHit? _targetedBlock;
 
     private double _titleTimer;
@@ -46,12 +52,19 @@ public class MainGame : Game
 
     protected override void Initialize()
     {
-        _camera = new FirstPersonCamera { Yaw = 0f, Pitch = 0f };
+        _worldSave = new WorldSave();
+        var meta = _worldSave.TryLoadMetadata();
+        _seed = meta?.Seed ?? DefaultSeed;
+        _savedHotbarIndex = meta?.HotbarIndex ?? 0;
+
+        _camera = new FirstPersonCamera { Yaw = meta?.Yaw ?? 0f, Pitch = meta?.Pitch ?? 0f };
         _camera.UpdateProjection(GraphicsDevice.Viewport.AspectRatio);
 
-        // Spawn above the highest possible terrain; the player falls to the
-        // ground once the spawn chunk has loaded.
-        _player = new PlayerController(new Vector3(8.5f, 70f, 8.5f));
+        // Fresh world: spawn above the highest possible terrain; the player
+        // falls to the ground once the spawn chunk has loaded.
+        _player = meta != null
+            ? new PlayerController(new Vector3(meta.PlayerX, meta.PlayerY, meta.PlayerZ), meta.IsFlying)
+            : new PlayerController(new Vector3(8.5f, 70f, 8.5f));
 
         base.Initialize();
     }
@@ -61,10 +74,11 @@ public class MainGame : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _atlas = new TextureAtlas(GraphicsDevice);
         _worldRenderer = new WorldRenderer(GraphicsDevice, _atlas);
-        _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(WorldSeed));
+        _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
         _blockHighlight = new BlockHighlight(GraphicsDevice);
         _hud = new Hud(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice);
+        _hotbar.Select(_savedHotbarIndex);
     }
 
     protected override void Update(GameTime gameTime)
@@ -80,7 +94,33 @@ public class MainGame : Game
         UpdateBlockInteraction();
         _chunkManager.Update(_player.Position);
 
+        if (keyboard.IsKeyDown(Keys.F5) && _previousKeyboard.IsKeyUp(Keys.F5))
+            SaveWorld();
+        _previousKeyboard = keyboard;
+
         base.Update(gameTime);
+    }
+
+    private void SaveWorld()
+    {
+        _chunkManager.SaveAllModified();
+        _worldSave.SaveMetadata(new WorldMetadata
+        {
+            Seed = _seed,
+            PlayerX = _player.Position.X,
+            PlayerY = _player.Position.Y,
+            PlayerZ = _player.Position.Z,
+            Yaw = _camera.Yaw,
+            Pitch = _camera.Pitch,
+            HotbarIndex = _hotbar.SelectedIndex,
+            IsFlying = _player.IsFlying,
+        });
+    }
+
+    protected override void OnExiting(object sender, ExitingEventArgs args)
+    {
+        SaveWorld();
+        base.OnExiting(sender, args);
     }
 
     private void UpdateBlockInteraction()

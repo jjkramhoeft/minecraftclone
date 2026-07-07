@@ -28,6 +28,9 @@ public class Chunk
 
     private readonly byte[] _blocks = new byte[SizeX * SizeY * SizeZ];
 
+    /// <summary>Raw block storage — exposed for save/load serialization only.</summary>
+    public byte[] Blocks => _blocks;
+
     public Chunk(ChunkCoord coord) => Coord = coord;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

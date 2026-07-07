@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using MinecraftClone.Persistence;
 using MinecraftClone.Rendering;
 
 namespace MinecraftClone.World;
@@ -27,6 +28,7 @@ public class ChunkManager : IDisposable
 
     private readonly GraphicsDevice _device;
     private readonly TerrainGenerator _generator;
+    private readonly WorldSave _save;
 
     private readonly Dictionary<ChunkCoord, Chunk> _chunks = new();
     private readonly Dictionary<ChunkCoord, ChunkMesh> _meshes = new();
@@ -43,10 +45,11 @@ public class ChunkManager : IDisposable
     public int LoadedChunkCount => _chunks.Count;
     public int PendingCount => _generating.Count + _meshing.Count;
 
-    public ChunkManager(GraphicsDevice device, TerrainGenerator generator)
+    public ChunkManager(GraphicsDevice device, TerrainGenerator generator, WorldSave save)
     {
         _device = device;
         _generator = generator;
+        _save = save;
     }
 
     public void Update(Vector3 playerPosition)
@@ -155,7 +158,10 @@ public class ChunkManager : IDisposable
                 var chunk = new Chunk(coord);
                 Task.Run(() =>
                 {
-                    _generator.Generate(chunk);
+                    // Player-modified chunks come from disk; everything else
+                    // regenerates deterministically from the seed.
+                    if (!_save.TryLoadChunk(chunk))
+                        _generator.Generate(chunk);
                     _generatedChunks.Enqueue(chunk);
                 });
             }
@@ -192,9 +198,22 @@ public class ChunkManager : IDisposable
 
         foreach (var coord in toUnload)
         {
-            _chunks.Remove(coord);
+            if (_chunks.Remove(coord, out var chunk) && chunk.IsModified)
+                _save.SaveChunk(chunk);
             if (_meshes.Remove(coord, out var mesh))
                 mesh.Dispose();
+        }
+    }
+
+    /// <summary>Writes every loaded chunk the player has edited. Used by F5 and on exit.</summary>
+    public void SaveAllModified()
+    {
+        foreach (var chunk in _chunks.Values)
+        {
+            if (!chunk.IsModified)
+                continue;
+            _save.SaveChunk(chunk);
+            chunk.IsModified = false; // already on disk; only re-save after another edit
         }
     }
 
