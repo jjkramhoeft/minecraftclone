@@ -14,6 +14,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Survival-lite inventory**: broken blocks drop items into a 24-slot inventory (`E` to open); placing consumes from the selected hotbar stack
 - **Crafting**: a recipe list in the inventory screen — wood into planks and sticks, sand into bricks, and wooden/stone tools
 - **Timed mining**: blocks have hardness, tools have speed; stone needs a pickaxe to drop, and a crack overlay shows breaking progress
+- **Falling sand**: gravity blocks drop cell-by-cell when their support is removed, cascading whole columns
 - **Pixel-style textures** from a procedurally generated texture atlas
 - **Lighting look** from per-face directional shading plus per-vertex ambient occlusion
 - **Distance fog** blending the horizon into the sky
@@ -69,6 +70,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `ChunkCoord.cs` | A chunk's position in the 2D chunk grid |
 | `ChunkManager.cs` | The heart of the world: streams chunks in and out around the player, schedules background generation/meshing, and exposes `GetBlock`/`SetBlock` in world coordinates — the single block API used by rendering, physics, and raycasting |
 | `TerrainGenerator.cs` | Fills chunks deterministically from the seed: fBm-noise heightmap, stone/dirt/grass strata, sandy lowlands, water-filled valleys, and hash-placed trees |
+| `BlockUpdater.cs` | Tick-based falling for gravity blocks (sand), triggered by player edits and its own moves |
 | `FastNoiseLite.cs` | Vendored single-file noise library (MIT) |
 
 ### `Rendering\` — from blocks to pixels

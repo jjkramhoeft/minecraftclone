@@ -97,4 +97,7 @@ public static class BlockInfo
         BlockType.Stone or BlockType.Bricks => 1,
         _ => 0,
     };
+
+    /// <summary>Gravity blocks fall when the cell below them is not solid.</summary>
+    public static bool HasGravity(BlockType type) => type == BlockType.Sand;
 }

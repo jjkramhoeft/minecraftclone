@@ -20,6 +20,7 @@ public class MainGame : Game
     private FirstPersonCamera _camera;
     private WorldRenderer _worldRenderer;
     private ChunkManager _chunkManager;
+    private BlockUpdater _blockUpdater;
     private PlayerController _player;
     private BlockInteraction _blockInteraction;
     private BlockHighlight _blockHighlight;
@@ -88,7 +89,8 @@ public class MainGame : Game
         _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
         _blockHighlight = new BlockHighlight(GraphicsDevice);
         _breakingOverlay = new BreakingOverlay(GraphicsDevice, _atlas);
-        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player);
+        _blockUpdater = new BlockUpdater();
+        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
@@ -126,6 +128,7 @@ public class MainGame : Game
             _blockInteraction.Update(_camera, mouse, _previousMouse, IsActive && _mouseCaptured, dt);
         }
         _chunkManager.Update(_player.Position);
+        _blockUpdater.Update(_chunkManager, dt);
 
         if (keyboard.IsKeyDown(Keys.F5) && _previousKeyboard.IsKeyUp(Keys.F5))
             SaveWorld();

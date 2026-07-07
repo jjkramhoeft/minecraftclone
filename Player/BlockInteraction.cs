@@ -20,6 +20,7 @@ public class BlockInteraction
     private readonly ChunkManager _world;
     private readonly Inventory _inventory;
     private readonly PlayerController _player;
+    private readonly BlockUpdater _blockUpdater;
 
     private (int X, int Y, int Z) _miningPos;
     private BlockType _miningType;
@@ -32,11 +33,12 @@ public class BlockInteraction
     public (int X, int Y, int Z) MiningPos => _miningPos;
     public bool IsMining => _progress > 0f;
 
-    public BlockInteraction(ChunkManager world, Inventory inventory, PlayerController player)
+    public BlockInteraction(ChunkManager world, Inventory inventory, PlayerController player, BlockUpdater blockUpdater)
     {
         _world = world;
         _inventory = inventory;
         _player = player;
+        _blockUpdater = blockUpdater;
     }
 
     public void Update(FirstPersonCamera camera, MouseState mouse, MouseState previousMouse, bool allowInput, float dt)
@@ -108,6 +110,7 @@ public class BlockInteraction
     private void BreakBlock(RaycastHit target, BlockType type, bool dropAllowed)
     {
         _world.SetBlock(target.X, target.Y, target.Z, BlockType.Air);
+        _blockUpdater.NotifyBlockChanged(target.X, target.Y, target.Z);
         _progress = 0f;
 
         if (dropAllowed)
@@ -136,6 +139,7 @@ public class BlockInteraction
             return;
 
         _world.SetBlock(x, y, z, blockToPlace);
+        _blockUpdater.NotifyBlockChanged(x, y, z);
         _inventory.ConsumeFromSlot(_inventory.SelectedIndex);
     }
 
