@@ -7,7 +7,7 @@ A small Minecraft-style voxel sandbox written in C# with [MonoGame](https://mono
 Each phase produces something runnable. Checked boxes are done.
 
 - [x] **Phase 0 — Scaffold + window**: MonoGame project builds and opens a 1280×720 window, Escape quits
-- [ ] **Phase 1 — Fly camera**: first-person mouse-look + WASD free-fly, one test cube rendered with `BasicEffect`
+- [x] **Phase 1 — Fly camera**: first-person mouse-look + WASD free-fly, one test cube rendered with `BasicEffect`
 - [ ] **Phase 2 — One chunk meshed**: 16×128×16 terrain chunk from a noise heightmap, culled meshing, per-face shading
 - [ ] **Phase 3 — Infinite world**: chunks generate/mesh on background threads as you move, unload behind you, seamless borders
 - [ ] **Phase 4 — Walking player**: gravity, jumping, AABB collision against the terrain (with a fly-mode debug toggle)
