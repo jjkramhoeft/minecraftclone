@@ -95,22 +95,18 @@ public static class ChunkMesher
                         continue;
                     }
 
+                    if (BlockInfo.IsWater(type))
+                    {
+                        AddWaterBlock(waterVertices, waterIndices, x, y, z, type, Sample);
+                        continue;
+                    }
+
                     for (int face = 0; face < 6; face++)
                     {
                         var (nx, ny, nz) = FaceNormals[face];
                         var neighbor = Sample(x + nx, y + ny, z + nz);
-
-                        if (type == BlockType.Water)
-                        {
-                            // Water surfaces only show against air; solid
-                            // neighbors hide it and water-water is interior.
-                            if (neighbor == BlockType.Air)
-                                AddWaterFace(waterVertices, waterIndices, x, y, z, face);
-                        }
-                        else if (!BlockInfo.IsSolid(neighbor))
-                        {
+                        if (!BlockInfo.IsSolid(neighbor))
                             AddFace(vertices, indices, x, y, z, face, type, Sample);
-                        }
                     }
                 }
             }
@@ -212,20 +208,73 @@ public static class ChunkMesher
         }
     }
 
+    /// <summary>
+    /// Rendered surface height: full cube for falling water and any cell with
+    /// water above (a waterfall is a continuous sheet); otherwise proportional
+    /// to the flow level, with the classic 14/16 sea-surface look for sources.
+    /// </summary>
+    private static float WaterHeight(BlockType type, BlockType above) =>
+        BlockInfo.IsWater(above) || type == BlockType.WaterFall
+            ? 1f
+            : BlockInfo.GetWaterLevel(type) * (0.875f / 8f);
+
+    private static void AddWaterBlock(List<VertexPositionColorTexture> vertices, List<int> indices,
+        int bx, int by, int bz, BlockType type, Func<int, int, int, BlockType> sample)
+    {
+        var above = sample(bx, by + 1, bz);
+        float myHeight = WaterHeight(type, above);
+
+        for (int face = 0; face < 6; face++)
+        {
+            var (nx, ny, nz) = FaceNormals[face];
+            var neighbor = sample(bx + nx, by + ny, bz + nz);
+            if (BlockInfo.IsSolid(neighbor))
+                continue; // hidden, as for opaque blocks
+
+            if (face is (int)BlockFace.Top or (int)BlockFace.Bottom)
+            {
+                // Water above/below makes the face interior.
+                if (!BlockInfo.IsWater(neighbor))
+                    AddWaterFace(vertices, indices, bx, by, bz, face, 0f, myHeight);
+                continue;
+            }
+
+            // Sides: against air, a full band up to our surface; against lower
+            // water, just the exposed band between the two surface heights.
+            float neighborHeight = BlockInfo.IsWater(neighbor)
+                ? WaterHeight(neighbor, sample(bx + nx, by + 1, bz + nz))
+                : 0f;
+            if (myHeight > neighborHeight)
+                AddWaterFace(vertices, indices, bx, by, bz, face, neighborHeight, myHeight);
+        }
+    }
+
     private static void AddWaterFace(List<VertexPositionColorTexture> vertices, List<int> indices,
-        int bx, int by, int bz, int face)
+        int bx, int by, int bz, int face, float yBottom, float yTop)
     {
         byte shade = (byte)(255 * FaceShade[face]);
         var color = new Color(shade, shade, shade, WaterAlpha);
         var uv = TextureAtlas.GetUVBounds(BlockInfo.TileWater);
         var blockPos = new Vector3(bx, by, bz);
         var corners = FaceCorners[face];
+        bool isSide = face >= 2;
+
+        Span<Vector2> uvs = stackalloc Vector2[]
+        {
+            new(uv.X, uv.W), new(uv.Z, uv.W), new(uv.Z, uv.Y), new(uv.X, uv.Y),
+        };
 
         int baseIndex = vertices.Count;
-        vertices.Add(new VertexPositionColorTexture(blockPos + corners[0], color, new Vector2(uv.X, uv.W)));
-        vertices.Add(new VertexPositionColorTexture(blockPos + corners[1], color, new Vector2(uv.Z, uv.W)));
-        vertices.Add(new VertexPositionColorTexture(blockPos + corners[2], color, new Vector2(uv.Z, uv.Y)));
-        vertices.Add(new VertexPositionColorTexture(blockPos + corners[3], color, new Vector2(uv.X, uv.Y)));
+        for (int i = 0; i < 4; i++)
+        {
+            var corner = corners[i];
+            float h = corner.Y < 0.5f ? yBottom : yTop;
+            var texCoord = uvs[i];
+            if (isSide) // texture anchored at the block bottom, so bands don't stretch
+                texCoord.Y = MathHelper.Lerp(uv.W, uv.Y, h);
+            vertices.Add(new VertexPositionColorTexture(
+                new Vector3(blockPos.X + corner.X, blockPos.Y + h, blockPos.Z + corner.Z), color, texCoord));
+        }
 
         indices.Add(baseIndex + 0);
         indices.Add(baseIndex + 1);

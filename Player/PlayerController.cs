@@ -69,10 +69,10 @@ public class PlayerController
         else
         {
             float speed = WalkSpeed * (keyboard.IsKeyDown(Keys.LeftControl) ? SprintMultiplier : 1f);
-            bool inWater = world.GetBlock(
+            bool inWater = BlockInfo.IsWater(world.GetBlock(
                 (int)MathF.Floor(Position.X),
                 (int)MathF.Floor(Position.Y + 0.6f),
-                (int)MathF.Floor(Position.Z)) == BlockType.Water;
+                (int)MathF.Floor(Position.Z)));
 
             if (inWater)
             {

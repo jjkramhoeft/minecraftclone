@@ -6,13 +6,13 @@ namespace MinecraftClone.Items;
 /// World layer (never the other way around).</summary>
 public static class ItemInfo
 {
-    /// <summary>Block items are ids 1–31 excluding water; the cast is safe because
-    /// ItemType mirrors BlockType in that range.</summary>
+    /// <summary>Block items are ids 1–31 excluding water (any variant); the cast
+    /// is safe because ItemType mirrors BlockType in that range.</summary>
     public static bool TryGetBlock(ItemType item, out BlockType block)
     {
         block = default;
         ushort id = (ushort)item;
-        if (id == 0 || id >= 32 || id == (ushort)BlockType.Water)
+        if (id == 0 || id >= 32 || BlockInfo.IsWater((BlockType)(byte)id))
             return false;
         block = (BlockType)(byte)id;
         return true;
@@ -43,7 +43,8 @@ public static class ItemInfo
     {
         BlockType.Grass => ItemType.Dirt,
         BlockType.Leaves => ItemType.None,
-        BlockType.Air or BlockType.Water => ItemType.None,
+        BlockType.Air => ItemType.None,
+        _ when BlockInfo.IsWater(block) => ItemType.None,
         _ => FromBlock(block),
     };
 

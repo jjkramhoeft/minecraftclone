@@ -138,7 +138,8 @@ public class BlockInteraction
         int y = target.Y + target.NormalY;
         int z = target.Z + target.NormalZ;
 
-        // Placing into water replaces it (there's no flow simulation). SetBlock
+        // Placing into water replaces it; the NotifyBlockChanged below lets the
+        // surrounding water react (drain or close over the block). SetBlock
         // silently no-ops on unloaded chunks, so verify before consuming the item.
         if (BlockInfo.IsSolid(_world.GetBlock(x, y, z))
             || IntersectsPlayer(x, y, z)
@@ -164,10 +165,10 @@ public class BlockInteraction
     }
 
     private bool HasAdjacentWater(int x, int y, int z) =>
-        _world.GetBlock(x + 1, y, z) == BlockType.Water
-        || _world.GetBlock(x - 1, y, z) == BlockType.Water
-        || _world.GetBlock(x, y, z + 1) == BlockType.Water
-        || _world.GetBlock(x, y, z - 1) == BlockType.Water;
+        BlockInfo.IsWater(_world.GetBlock(x + 1, y, z))
+        || BlockInfo.IsWater(_world.GetBlock(x - 1, y, z))
+        || BlockInfo.IsWater(_world.GetBlock(x, y, z + 1))
+        || BlockInfo.IsWater(_world.GetBlock(x, y, z - 1));
 
     private bool IntersectsPlayer(int x, int y, int z)
     {

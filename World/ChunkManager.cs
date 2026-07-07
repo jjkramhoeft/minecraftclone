@@ -101,6 +101,41 @@ public class ChunkManager : IDisposable
         if (localZ == Chunk.SizeZ - 1) RemeshNow(new ChunkCoord(coord.X, coord.Z + 1));
     }
 
+    /// <summary>
+    /// Simulation edit (water flow): sets the block and marks meshes dirty for
+    /// the async mesher instead of remeshing synchronously — many cells change
+    /// per tick and the MeshDirty flag coalesces them into one rebuild per chunk.
+    /// Returns false when the chunk isn't loaded so the simulation can stop
+    /// instead of retrying forever at the streaming horizon.
+    /// </summary>
+    public bool SetBlockDeferred(int x, int y, int z, BlockType type)
+    {
+        if (y < 0 || y >= Chunk.SizeY)
+            return false;
+        var coord = new ChunkCoord(x >> 4, z >> 4);
+        if (!_chunks.TryGetValue(coord, out var chunk))
+            return false;
+
+        int localX = x & 15, localZ = z & 15;
+        chunk.SetBlock(localX, y, localZ, type);
+        chunk.IsModified = true;
+        chunk.Version++; // any in-flight mesh build is now stale
+        chunk.MeshDirty = true;
+
+        // A border edit changes the neighbor's face culling too.
+        if (localX == 0) MarkMeshDirty(new ChunkCoord(coord.X - 1, coord.Z));
+        if (localX == Chunk.SizeX - 1) MarkMeshDirty(new ChunkCoord(coord.X + 1, coord.Z));
+        if (localZ == 0) MarkMeshDirty(new ChunkCoord(coord.X, coord.Z - 1));
+        if (localZ == Chunk.SizeZ - 1) MarkMeshDirty(new ChunkCoord(coord.X, coord.Z + 1));
+        return true;
+    }
+
+    private void MarkMeshDirty(ChunkCoord coord)
+    {
+        if (_chunks.TryGetValue(coord, out var chunk))
+            chunk.MeshDirty = true;
+    }
+
     private void RemeshNow(ChunkCoord coord)
     {
         if (!_chunks.TryGetValue(coord, out var chunk))

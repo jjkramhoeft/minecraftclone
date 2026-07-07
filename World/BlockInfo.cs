@@ -63,7 +63,23 @@ public static class BlockInfo
     /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
     /// occlusion. Plants are deliberately NOT solid — you walk through them.</summary>
     public static bool IsSolid(BlockType type) =>
-        type is not (BlockType.Air or BlockType.Water) && !IsPlant(type);
+        type != BlockType.Air && !IsWater(type) && !IsPlant(type);
+
+    /// <summary>Source water and every flowing/falling variant.</summary>
+    public static bool IsWater(BlockType type) =>
+        type is BlockType.Water or (>= BlockType.WaterFlow1 and <= BlockType.WaterFall);
+
+    /// <summary>Source and falling water are level 8; WaterFlowN is N; non-water is 0.</summary>
+    public static int GetWaterLevel(BlockType type) => type switch
+    {
+        BlockType.Water or BlockType.WaterFall => 8,
+        >= BlockType.WaterFlow1 and <= BlockType.WaterFlow7 => type - BlockType.WaterFlow1 + 1,
+        _ => 0,
+    };
+
+    /// <summary>The flowing-water block for a level in 1..7.</summary>
+    public static BlockType FlowBlockForLevel(int level) =>
+        (BlockType)((int)BlockType.WaterFlow1 + level - 1);
 
     public static bool IsFlower(BlockType type) =>
         type is >= BlockType.FlowerRed and <= BlockType.FlowerPoppy;
@@ -103,6 +119,7 @@ public static class BlockInfo
         BlockType.FlowerYellow => TileFlowerYellow,
         BlockType.FlowerPoppy => TileFlowerPoppy,
         BlockType.Reeds => TileReeds,
+        _ when IsWater(type) => TileWater,
         _ => TileDirt,
     };
 
