@@ -54,6 +54,8 @@ public class TextureAtlas
         DrawSpeckled(pixels, BlockInfo.TileShirt, new Color(66, 150, 178), 7);
         DrawSpeckled(pixels, BlockInfo.TilePants, new Color(58, 68, 118), 6);
         DrawFace(pixels);
+        DrawDisc(pixels, BlockInfo.TileSun, new Color(255, 236, 160), new Color(255, 196, 90));
+        DrawDisc(pixels, BlockInfo.TileMoon, new Color(226, 228, 240), new Color(180, 184, 205));
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -257,6 +259,32 @@ public class TextureAtlas
                     x = Math.Clamp(x + rng.Next(-1, 2), 0, TileSize - 1); // gentle kink
                 if (y is 6 or 10 && rng.Next(2) == 0)
                     SetPixel(pixels, BlockInfo.TileReeds, Math.Clamp(x + 1, 0, TileSize - 1), y, Jitter(rng, stalk, 8)); // leaf nub
+            }
+        }
+    }
+
+    /// <summary>Sun/moon sprite: a soft-edged disc on a transparent background,
+    /// blending from a bright core to a rim color; the moon gets crater speckle.</summary>
+    private static void DrawDisc(Color[] pixels, int tile, Color core, Color rim)
+    {
+        var rng = RngFor(tile);
+        for (int y = 0; y < TileSize; y++)
+        {
+            for (int x = 0; x < TileSize; x++)
+            {
+                float distance = MathF.Sqrt((x - 7.5f) * (x - 7.5f) + (y - 7.5f) * (y - 7.5f));
+                if (distance > 6.5f)
+                {
+                    SetPixel(pixels, tile, x, y, Color.Transparent);
+                    continue;
+                }
+
+                var color = Color.Lerp(core, rim, Math.Clamp(distance / 6.5f, 0f, 1f));
+                if (tile == BlockInfo.TileMoon && rng.Next(7) == 0)
+                    color = Color.Lerp(color, new Color(140, 145, 170), 0.6f); // craters
+                if (distance > 5.5f)
+                    color *= 1f - (distance - 5.5f); // soft edge fade to transparent
+                SetPixel(pixels, tile, x, y, color);
             }
         }
     }

@@ -21,6 +21,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Pixel-style textures** from a procedurally generated texture atlas
 - **Lighting look** from per-face directional shading plus per-vertex ambient occlusion
 - **Distance fog** blending the horizon into the sky
+- **Day/night cycle** (10-minute days): the sky shifts through sunrise, noon, sunset, and night; the world dims to a moonlit floor after dark; a sun and moon cross the sky and stars come out at night
 - **Persistent worlds**: your edits, position, and settings survive restarts
 
 ## Controls
@@ -77,6 +78,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `TerrainGenerator.cs` | Fills chunks deterministically from the seed: fBm-noise heightmap, stone/dirt/grass strata, sandy lowlands, water-filled valleys, and hash-placed trees |
 | `BlockUpdater.cs` | Tick-based block updates: detaches unsupported gravity blocks, pops unsupported plants |
 | `FallingBlocks.cs` | Airborne gravity blocks: smooth accelerated fall, landing back into the grid (settled on exit so none are lost) |
+| `DayNightCycle.cs` | Game time (0..1 over a 10-minute day) and the keyframed sky color, scene light, and star visibility derived from it |
 | `FastNoiseLite.cs` | Vendored single-file noise library (MIT) |
 
 ### `Rendering\` — from blocks to pixels
@@ -92,6 +94,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `BlockHighlight.cs` | Wireframe outline around the block under the crosshair |
 | `BreakingOverlay.cs` | Crack texture drawn over the block being mined, staged by progress |
 | `FallingBlockRenderer.cs` | Textured cubes for airborne falling blocks at their continuous positions |
+| `SkyRenderer.cs` | Sun, moon, and stars — camera-relative quads drawn behind the world |
 
 ### `Player\` — input, physics, interaction
 
@@ -144,7 +147,7 @@ The choices that shape the code, written down so future-me doesn't relitigate th
 
 Saves live in `saves\default\` relative to the working directory (next to the executable when launching the exe directly, or in the project root under `dotnet run`/F5):
 
-- `world.json` — seed, format version, player position/rotation, selected hotbar slot, fly mode
+- `world.json` — seed, format version, player position/rotation, selected hotbar slot, fly mode, inventory, time of day
 - `chunks\c_{x}_{z}.bin` — one file per *modified* chunk: small header (magic, version, chunk coordinate) followed by the raw 32 KB block array behind a `GZipStream` (~1-3 KB on disk)
 
 Saving happens automatically when chunks unload and when the game exits; `F5` forces a full save. Press `N` in-game (or delete the `saves` folder) for a fresh world with a new random seed — this erases the current world and inventory.

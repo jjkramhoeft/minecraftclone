@@ -28,6 +28,9 @@ public class WorldMetadata
     public int HotbarIndex { get; set; }
     public bool IsFlying { get; set; }
 
+    /// <summary>0..1 day fraction; defaults to morning for saves that predate it.</summary>
+    public float TimeOfDay { get; set; } = 0.1f;
+
     /// <summary>Null in pre-v2 saves — treated as an empty inventory.</summary>
     public List<InventorySlotData> Inventory { get; set; }
 }

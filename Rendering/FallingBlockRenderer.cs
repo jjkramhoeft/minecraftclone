@@ -59,6 +59,13 @@ public class FallingBlockRenderer
         }
     }
 
+    /// <summary>Per-frame scene light (day/night dimming) and fog/sky color.</summary>
+    public void SetEnvironment(Vector3 light, Color sky)
+    {
+        _effect.DiffuseColor = light;
+        _effect.FogColor = sky.ToVector3();
+    }
+
     public void Draw(GraphicsDevice device, FirstPersonCamera camera, System.Collections.Generic.IReadOnlyList<FallingBlocks.Entry> entries)
     {
         if (entries.Count == 0)

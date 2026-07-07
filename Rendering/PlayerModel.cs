@@ -67,6 +67,13 @@ public class PlayerModel
         _leftLeg = BuildBox(new Vector3(-0.125f, -0.75f, -0.125f), new Vector3(0.125f, 0f, 0.125f), Uniform(pants), new Vector3(-0.125f, 0.75f, 0f));
     }
 
+    /// <summary>Per-frame scene light (day/night dimming) and fog/sky color.</summary>
+    public void SetEnvironment(Vector3 light, Color sky)
+    {
+        _effect.DiffuseColor = light;
+        _effect.FogColor = sky.ToVector3();
+    }
+
     /// <summary>Starts the mine/place arm swing.</summary>
     public void TriggerSwing() => _swingTimer = SwingDuration;
 

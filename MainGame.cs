@@ -24,6 +24,8 @@ public class MainGame : Game
     private BlockUpdater _blockUpdater;
     private FallingBlocks _fallingBlocks;
     private FallingBlockRenderer _fallingBlockRenderer;
+    private DayNightCycle _dayNight;
+    private SkyRenderer _skyRenderer;
     private PlayerController _player;
     private BlockInteraction _blockInteraction;
     private BlockHighlight _blockHighlight;
@@ -75,6 +77,7 @@ public class MainGame : Game
 
         _camera = new FirstPersonCamera { Yaw = meta?.Yaw ?? 0f, Pitch = meta?.Pitch ?? 0f };
         _camera.UpdateProjection(GraphicsDevice.Viewport.AspectRatio);
+        _dayNight = new DayNightCycle { TimeOfDay = meta?.TimeOfDay ?? 0.1f };
 
         // Fresh world: spawn above the highest possible terrain; the player
         // falls to the ground once the spawn chunk has loaded.
@@ -96,6 +99,7 @@ public class MainGame : Game
         _blockUpdater = new BlockUpdater();
         _fallingBlocks = new FallingBlocks();
         _fallingBlockRenderer = new FallingBlockRenderer(GraphicsDevice, _atlas);
+        _skyRenderer = new SkyRenderer(GraphicsDevice, _atlas);
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
         _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
@@ -144,6 +148,7 @@ public class MainGame : Game
         _chunkManager.Update(_player.Position);
         _blockUpdater.Update(_chunkManager, _fallingBlocks, dt);
         _fallingBlocks.Update(_chunkManager, _blockUpdater, dt);
+        _dayNight.Update(dt);
         _playerModel.Update(_player, dt, !_inventoryScreen.IsOpen && _blockInteraction.IsMining);
 
         if (keyboard.IsKeyDown(Keys.F5) && _previousKeyboard.IsKeyUp(Keys.F5))
@@ -175,6 +180,7 @@ public class MainGame : Game
         _inventory.Clear();
         _camera.Yaw = 0f;
         _camera.Pitch = 0f;
+        _dayNight.TimeOfDay = 0.1f;
 
         SaveWorld(); // pin the new seed to disk immediately
     }
@@ -222,6 +228,7 @@ public class MainGame : Game
             HotbarIndex = _inventory.SelectedIndex,
             IsFlying = _player.IsFlying,
             Inventory = inventorySlots,
+            TimeOfDay = _dayNight.TimeOfDay,
         });
     }
 
@@ -254,9 +261,14 @@ public class MainGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(Color.CornflowerBlue);
+        GraphicsDevice.Clear(_dayNight.SkyColor);
 
         int width = GraphicsDevice.Viewport.Width, height = GraphicsDevice.Viewport.Height;
+
+        _skyRenderer.Draw(GraphicsDevice, _camera, _dayNight);
+        _worldRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
+        _playerModel.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
+        _fallingBlockRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
 
         _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
         _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);

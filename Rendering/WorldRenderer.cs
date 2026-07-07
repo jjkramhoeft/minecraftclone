@@ -47,6 +47,15 @@ public class WorldRenderer
         };
     }
 
+    /// <summary>Per-frame scene light (day/night dimming) and fog/sky color.</summary>
+    public void SetEnvironment(Vector3 light, Color sky)
+    {
+        _effect.DiffuseColor = light;
+        _effect.FogColor = sky.ToVector3();
+        _cutoutEffect.DiffuseColor = light;
+        _cutoutEffect.FogColor = sky.ToVector3();
+    }
+
     public void Draw(GraphicsDevice device, FirstPersonCamera camera, IEnumerable<ChunkMesh> meshes)
     {
         _effect.View = camera.View;

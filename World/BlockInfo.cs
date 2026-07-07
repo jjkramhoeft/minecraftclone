@@ -56,6 +56,9 @@ public static class BlockInfo
     public const int TilePants = 27;
     public const int TileFace = 28;
     public const int TileReeds = 29;
+    // Sky sprites (never on block faces)
+    public const int TileSun = 30;
+    public const int TileMoon = 31;
 
     /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
     /// occlusion. Plants are deliberately NOT solid — you walk through them.</summary>
