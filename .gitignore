@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Game save data
 saves/
+
+# VS Code Counter extension output
+.VSCodeCounter/
