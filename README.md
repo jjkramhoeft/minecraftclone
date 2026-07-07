@@ -15,6 +15,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Crafting**: a recipe list in the inventory screen — wood into planks and sticks, sand into bricks, and wooden/stone tools
 - **Timed mining**: blocks have hardness, tools have speed; stone needs a pickaxe to drop, and a crack overlay shows breaking progress
 - **Falling sand**: gravity blocks drop cell-by-cell when their support is removed, cascading whole columns
+- **Flowers**: three decorative variants scattered on grass, breakable/plantable (on grass or dirt), drawn as cross-quads in an alpha-test pass
 - **Pixel-style textures** from a procedurally generated texture atlas
 - **Lighting look** from per-face directional shading plus per-vertex ambient occlusion
 - **Distance fog** blending the horizon into the sky

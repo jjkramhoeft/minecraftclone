@@ -11,7 +11,11 @@ namespace MinecraftClone.Rendering;
 /// </summary>
 public class WorldRenderer
 {
+    private const float FogStart = 70f;
+    private const float FogEnd = 122f; // just inside the mesh radius (8 chunks = 128 blocks)
+
     private readonly BasicEffect _effect;
+    private readonly AlphaTestEffect _cutoutEffect;
     private readonly List<ChunkMesh> _visible = new();
 
     public WorldRenderer(GraphicsDevice device, TextureAtlas atlas)
@@ -24,8 +28,22 @@ public class WorldRenderer
             Texture = atlas.Texture,
             FogEnabled = true,
             FogColor = Color.CornflowerBlue.ToVector3(), // must match the clear color
-            FogStart = 70f,
-            FogEnd = 122f, // just inside the mesh radius (8 chunks = 128 blocks)
+            FogStart = FogStart,
+            FogEnd = FogEnd,
+        };
+
+        // Cutout (flowers): binary-alpha geometry that writes depth, so it
+        // needs alpha *testing* rather than blending.
+        _cutoutEffect = new AlphaTestEffect(device)
+        {
+            VertexColorEnabled = true,
+            Texture = atlas.Texture,
+            AlphaFunction = CompareFunction.Greater,
+            ReferenceAlpha = 128,
+            FogEnabled = true,
+            FogColor = Color.CornflowerBlue.ToVector3(),
+            FogStart = FogStart,
+            FogEnd = FogEnd,
         };
     }
 
@@ -56,6 +74,25 @@ public class WorldRenderer
                 mesh.DrawOpaque(device);
             }
         }
+
+        // Cutout pass (flowers): depth-writing like opaque, but double-sided.
+        _cutoutEffect.View = camera.View;
+        _cutoutEffect.Projection = camera.Projection;
+        device.RasterizerState = RasterizerState.CullNone;
+
+        foreach (var mesh in _visible)
+        {
+            if (!mesh.HasCutout)
+                continue;
+            _cutoutEffect.World = mesh.World;
+            foreach (var pass in _cutoutEffect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
+                mesh.DrawCutout(device);
+            }
+        }
+
+        device.RasterizerState = RasterizerState.CullCounterClockwise;
 
         // Water: blended, reads depth but doesn't write it, so overlapping
         // water faces never punch holes in each other.

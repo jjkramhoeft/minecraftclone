@@ -46,6 +46,9 @@ public class TextureAtlas
         DrawCracks(pixels, BlockInfo.TileCrack1, 6);
         DrawCracks(pixels, BlockInfo.TileCrack2, 10);
         DrawCracks(pixels, BlockInfo.TileCrack3, 16);
+        DrawFlower(pixels, BlockInfo.TileFlowerRed, new Color(214, 48, 44));
+        DrawFlower(pixels, BlockInfo.TileFlowerYellow, new Color(238, 210, 60));
+        DrawFlower(pixels, BlockInfo.TileFlowerPoppy, new Color(238, 238, 230));
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -224,6 +227,31 @@ public class TextureAtlas
                             SetPixel(pixels, tile, x, y, head);
                 break;
         }
+    }
+
+    /// <summary>Flower sprite for the cross-quad cutout mesh: transparent
+    /// background (binary alpha, so alpha-testing cuts cleanly), a green stem
+    /// with two leaves and a petal cluster on top.</summary>
+    private static void DrawFlower(Color[] pixels, int tile, Color petal)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Color.Transparent);
+
+        var stem = new Color(58, 128, 44);
+        for (int y = 5; y < TileSize; y++)
+            SetPixel(pixels, tile, 7, y, stem);
+        SetPixel(pixels, tile, 6, 10, stem); // leaves
+        SetPixel(pixels, tile, 5, 9, stem);
+        SetPixel(pixels, tile, 8, 12, stem);
+        SetPixel(pixels, tile, 9, 11, stem);
+
+        var center = new Color(90, 70, 30);
+        for (int dy = -2; dy <= 2; dy++)
+            for (int dx = -2; dx <= 2; dx++)
+                if (Math.Abs(dx) + Math.Abs(dy) <= 2)
+                    SetPixel(pixels, tile, 7 + dx, 3 + dy, petal);
+        SetPixel(pixels, tile, 7, 3, center);
     }
 
     /// <summary>Breaking-progress overlay: dark crack strands random-walking out

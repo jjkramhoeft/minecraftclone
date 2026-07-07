@@ -12,4 +12,7 @@ public enum BlockType : byte
     Water,
     Planks,
     Bricks,
+    FlowerRed,
+    FlowerYellow,
+    FlowerPoppy,
 }

@@ -47,9 +47,21 @@ public static class BlockInfo
     public const int TileCrack1 = 19;
     public const int TileCrack2 = 20;
     public const int TileCrack3 = 21;
+    public const int TileFlowerRed = 22;
+    public const int TileFlowerYellow = 23;
+    public const int TileFlowerPoppy = 24;
 
-    /// <summary>Solid blocks collide, block raycasts, and hide neighboring faces.</summary>
-    public static bool IsSolid(BlockType type) => type is not (BlockType.Air or BlockType.Water);
+    /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
+    /// occlusion. Flowers are deliberately NOT solid — you walk through them.</summary>
+    public static bool IsSolid(BlockType type) =>
+        type is not (BlockType.Air or BlockType.Water) && !IsFlower(type);
+
+    public static bool IsFlower(BlockType type) =>
+        type is >= BlockType.FlowerRed and <= BlockType.FlowerPoppy;
+
+    /// <summary>What the crosshair raycast can hit: solid blocks and flowers,
+    /// but never water or air.</summary>
+    public static bool IsTargetable(BlockType type) => IsSolid(type) || IsFlower(type);
 
     public static int GetFaceTile(BlockType type, BlockFace face) => type switch
     {
@@ -67,6 +79,9 @@ public static class BlockInfo
         BlockType.Water => TileWater,
         BlockType.Planks => TilePlanks,
         BlockType.Bricks => TileBricks,
+        BlockType.FlowerRed => TileFlowerRed,
+        BlockType.FlowerYellow => TileFlowerYellow,
+        BlockType.FlowerPoppy => TileFlowerPoppy,
         _ => TileDirt,
     };
 
@@ -79,6 +94,7 @@ public static class BlockInfo
         BlockType.Wood => 2f,
         BlockType.Planks => 1.5f,
         BlockType.Stone or BlockType.Bricks => 4f,
+        _ when IsFlower(type) => 0f, // instant break
         _ => 1f,
     };
 

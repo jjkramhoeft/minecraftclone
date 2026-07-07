@@ -16,13 +16,16 @@ public class ChunkMesh : IDisposable
     private readonly IndexBuffer _indexBuffer;
     private readonly VertexBuffer _waterVertexBuffer;
     private readonly IndexBuffer _waterIndexBuffer;
+    private readonly VertexBuffer _cutoutVertexBuffer;
+    private readonly IndexBuffer _cutoutIndexBuffer;
 
     public ChunkCoord Coord { get; }
     public BoundingBox Bounds { get; }
 
-    public bool IsEmpty => _indexBuffer == null && _waterIndexBuffer == null;
+    public bool IsEmpty => _indexBuffer == null && _waterIndexBuffer == null && _cutoutIndexBuffer == null;
     public bool HasOpaque => _indexBuffer != null;
     public bool HasWater => _waterIndexBuffer != null;
+    public bool HasCutout => _cutoutIndexBuffer != null;
 
     public Matrix World => Matrix.CreateTranslation(Coord.X * Chunk.SizeX, 0f, Coord.Z * Chunk.SizeZ);
 
@@ -47,6 +50,14 @@ public class ChunkMesh : IDisposable
             _waterIndexBuffer = new IndexBuffer(device, IndexElementSize.ThirtyTwoBits, data.WaterIndices.Length, BufferUsage.WriteOnly);
             _waterIndexBuffer.SetData(data.WaterIndices);
         }
+
+        if (data.CutoutIndices.Length > 0)
+        {
+            _cutoutVertexBuffer = new VertexBuffer(device, VertexPositionColorTexture.VertexDeclaration, data.CutoutVertices.Length, BufferUsage.WriteOnly);
+            _cutoutVertexBuffer.SetData(data.CutoutVertices);
+            _cutoutIndexBuffer = new IndexBuffer(device, IndexElementSize.ThirtyTwoBits, data.CutoutIndices.Length, BufferUsage.WriteOnly);
+            _cutoutIndexBuffer.SetData(data.CutoutIndices);
+        }
     }
 
     public void DrawOpaque(GraphicsDevice device)
@@ -67,11 +78,22 @@ public class ChunkMesh : IDisposable
         device.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _waterIndexBuffer.IndexCount / 3);
     }
 
+    public void DrawCutout(GraphicsDevice device)
+    {
+        if (!HasCutout)
+            return;
+        device.SetVertexBuffer(_cutoutVertexBuffer);
+        device.Indices = _cutoutIndexBuffer;
+        device.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _cutoutIndexBuffer.IndexCount / 3);
+    }
+
     public void Dispose()
     {
         _vertexBuffer?.Dispose();
         _indexBuffer?.Dispose();
         _waterVertexBuffer?.Dispose();
         _waterIndexBuffer?.Dispose();
+        _cutoutVertexBuffer?.Dispose();
+        _cutoutIndexBuffer?.Dispose();
     }
 }

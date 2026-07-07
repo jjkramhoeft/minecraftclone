@@ -20,8 +20,8 @@ public static class VoxelRaycaster
         int y = (int)MathF.Floor(origin.Y);
         int z = (int)MathF.Floor(origin.Z);
 
-        // Degenerate but possible: the eye is inside a solid block.
-        if (BlockInfo.IsSolid(world.GetBlock(x, y, z)))
+        // Degenerate but possible: the eye is inside a targetable block.
+        if (BlockInfo.IsTargetable(world.GetBlock(x, y, z)))
         {
             hit = new RaycastHit(x, y, z, 0, 0, 0);
             return true;
@@ -71,7 +71,7 @@ public static class VoxelRaycaster
                 return false;
             }
 
-            if (BlockInfo.IsSolid(world.GetBlock(x, y, z)))
+            if (BlockInfo.IsTargetable(world.GetBlock(x, y, z)))
             {
                 hit = new RaycastHit(x, y, z, nx, ny, nz);
                 return true;

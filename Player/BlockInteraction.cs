@@ -138,6 +138,14 @@ public class BlockInteraction
             || !_world.IsChunkLoaded(ChunkManager.ToChunkCoord(new Vector3(x, 0, z))))
             return;
 
+        // Flowers only grow on grass or dirt.
+        if (BlockInfo.IsFlower(blockToPlace))
+        {
+            var below = _world.GetBlock(x, y - 1, z);
+            if (below != BlockType.Grass && below != BlockType.Dirt)
+                return;
+        }
+
         _world.SetBlock(x, y, z, blockToPlace);
         _blockUpdater.NotifyBlockChanged(x, y, z);
         _inventory.ConsumeFromSlot(_inventory.SelectedIndex);

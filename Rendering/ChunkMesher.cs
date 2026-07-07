@@ -9,9 +9,10 @@ namespace MinecraftClone.Rendering;
 /// <summary>CPU-side mesh: safe to build on a worker thread, uploaded to the GPU by ChunkMesh.</summary>
 public record MeshData(
     VertexPositionColorTexture[] Vertices, int[] Indices,
-    VertexPositionColorTexture[] WaterVertices, int[] WaterIndices)
+    VertexPositionColorTexture[] WaterVertices, int[] WaterIndices,
+    VertexPositionColorTexture[] CutoutVertices, int[] CutoutIndices)
 {
-    public bool IsEmpty => Indices.Length == 0 && WaterIndices.Length == 0;
+    public bool IsEmpty => Indices.Length == 0 && WaterIndices.Length == 0 && CutoutIndices.Length == 0;
 }
 
 /// <summary>
@@ -70,6 +71,8 @@ public static class ChunkMesher
         var indices = new List<int>();
         var waterVertices = new List<VertexPositionColorTexture>();
         var waterIndices = new List<int>();
+        var cutoutVertices = new List<VertexPositionColorTexture>();
+        var cutoutIndices = new List<int>();
 
         BlockType Sample(int x, int y, int z) =>
             Chunk.InBounds(x, y, z) ? chunk.GetBlock(x, y, z) : getOutsideBlock(x, y, z);
@@ -83,6 +86,14 @@ public static class ChunkMesher
                     var type = chunk.GetBlock(x, y, z);
                     if (type == BlockType.Air)
                         continue;
+
+                    if (BlockInfo.IsFlower(type))
+                    {
+                        // Flowers are crossed quads in the cutout pass — no
+                        // faces, no culling, no AO, no neighbor reads.
+                        AddCrossQuads(cutoutVertices, cutoutIndices, x, y, z, type);
+                        continue;
+                    }
 
                     for (int face = 0; face < 6; face++)
                     {
@@ -105,7 +116,40 @@ public static class ChunkMesher
             }
         }
 
-        return new MeshData(vertices.ToArray(), indices.ToArray(), waterVertices.ToArray(), waterIndices.ToArray());
+        return new MeshData(
+            vertices.ToArray(), indices.ToArray(),
+            waterVertices.ToArray(), waterIndices.ToArray(),
+            cutoutVertices.ToArray(), cutoutIndices.ToArray());
+    }
+
+    // The two diagonal quads of a flower, inset from the block edges. Drawn
+    // with CullNone, so a single winding per quad shows both sides.
+    private static readonly Vector3[][] CrossQuads =
+    {
+        new[] { new Vector3(0.15f, 0, 0.15f), new Vector3(0.85f, 0, 0.85f), new Vector3(0.85f, 1, 0.85f), new Vector3(0.15f, 1, 0.15f) },
+        new[] { new Vector3(0.85f, 0, 0.15f), new Vector3(0.15f, 0, 0.85f), new Vector3(0.15f, 1, 0.85f), new Vector3(0.85f, 1, 0.15f) },
+    };
+
+    private static void AddCrossQuads(List<VertexPositionColorTexture> vertices, List<int> indices, int bx, int by, int bz, BlockType type)
+    {
+        var uv = TextureAtlas.GetUVBounds(BlockInfo.GetFaceTile(type, BlockFace.South));
+        var blockPos = new Vector3(bx, by, bz);
+
+        foreach (var quad in CrossQuads)
+        {
+            int baseIndex = vertices.Count;
+            vertices.Add(new VertexPositionColorTexture(blockPos + quad[0], Color.White, new Vector2(uv.X, uv.W)));
+            vertices.Add(new VertexPositionColorTexture(blockPos + quad[1], Color.White, new Vector2(uv.Z, uv.W)));
+            vertices.Add(new VertexPositionColorTexture(blockPos + quad[2], Color.White, new Vector2(uv.Z, uv.Y)));
+            vertices.Add(new VertexPositionColorTexture(blockPos + quad[3], Color.White, new Vector2(uv.X, uv.Y)));
+
+            indices.Add(baseIndex + 0);
+            indices.Add(baseIndex + 1);
+            indices.Add(baseIndex + 2);
+            indices.Add(baseIndex + 0);
+            indices.Add(baseIndex + 2);
+            indices.Add(baseIndex + 3);
+        }
     }
 
     private static void AddFace(List<VertexPositionColorTexture> vertices, List<int> indices,

@@ -16,6 +16,7 @@ public class TerrainGenerator
     private const int SandLevel = 38;       // surfaces at or below this are sandy
     private const int WaterLevel = 37;      // valleys below this fill with water
     private const int TreeSpacing = 61;     // 1 tree per ~61 eligible columns
+    private const int FlowerSpacing = 17;   // 1 flower per ~17 grass columns
 
     private readonly FastNoiseLite _heightNoise;
 
@@ -64,6 +65,33 @@ public class TerrainGenerator
         }
 
         PlantTrees(chunk, heights);
+        ScatterFlowers(chunk, heights);
+    }
+
+    /// <summary>Flowers on grass wherever the salted column hash says so —
+    /// runs after trees, so columns under a canopy (leaves above) are skipped.</summary>
+    private void ScatterFlowers(Chunk chunk, ReadOnlySpan<int> heights)
+    {
+        for (int x = 0; x < Chunk.SizeX; x++)
+        {
+            for (int z = 0; z < Chunk.SizeZ; z++)
+            {
+                int worldX = chunk.Coord.X * Chunk.SizeX + x;
+                int worldZ = chunk.Coord.Z * Chunk.SizeZ + z;
+                int hash = Hash(worldX, worldZ, Seed ^ 0x5F375A86);
+                if (hash % FlowerSpacing != 0)
+                    continue;
+
+                int surface = heights[x + z * Chunk.SizeX];
+                if (surface + 1 >= Chunk.SizeY
+                    || chunk.GetBlock(x, surface, z) != BlockType.Grass
+                    || chunk.GetBlock(x, surface + 1, z) != BlockType.Air)
+                    continue;
+
+                var flower = (BlockType)((byte)BlockType.FlowerRed + hash / FlowerSpacing % 3);
+                chunk.SetBlock(x, surface + 1, z, flower);
+            }
+        }
     }
 
     /// <summary>
