@@ -20,19 +20,21 @@ public static class PlayerPhysics
     // re-embeds the player in the geometry it was just pushed out of.
     private const float Skin = 0.001f;
 
+    /// <param name="hitWall">True when the move was blocked horizontally.</param>
     /// <returns>True when the player ended the move standing on solid ground.</returns>
-    public static bool MoveWithCollision(ref Vector3 position, ref Vector3 velocity, ChunkManager world, float dt)
+    public static bool MoveWithCollision(ref Vector3 position, ref Vector3 velocity, ChunkManager world, float dt, out bool hitWall)
     {
         bool onGround = false;
-        MoveAxis(ref position.Y, ref velocity.Y, velocity.Y * dt, Axis.Y, ref position, world, ref onGround);
-        MoveAxis(ref position.X, ref velocity.X, velocity.X * dt, Axis.X, ref position, world, ref onGround);
-        MoveAxis(ref position.Z, ref velocity.Z, velocity.Z * dt, Axis.Z, ref position, world, ref onGround);
+        hitWall = false;
+        MoveAxis(ref position.Y, ref velocity.Y, velocity.Y * dt, Axis.Y, ref position, world, ref onGround, ref hitWall);
+        MoveAxis(ref position.X, ref velocity.X, velocity.X * dt, Axis.X, ref position, world, ref onGround, ref hitWall);
+        MoveAxis(ref position.Z, ref velocity.Z, velocity.Z * dt, Axis.Z, ref position, world, ref onGround, ref hitWall);
         return onGround;
     }
 
     private enum Axis { X, Y, Z }
 
-    private static void MoveAxis(ref float positionAxis, ref float velocityAxis, float delta, Axis axis, ref Vector3 position, ChunkManager world, ref bool onGround)
+    private static void MoveAxis(ref float positionAxis, ref float velocityAxis, float delta, Axis axis, ref Vector3 position, ChunkManager world, ref bool onGround, ref bool hitWall)
     {
         if (delta == 0f)
             return;
@@ -80,6 +82,8 @@ public static class PlayerPhysics
 
         if (axis == Axis.Y && delta < 0)
             onGround = true;
+        if (axis != Axis.Y)
+            hitWall = true;
         velocityAxis = 0f;
     }
 }

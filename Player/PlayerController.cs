@@ -21,9 +21,13 @@ public class PlayerController
     private const float TerminalVelocity = -50f;
     private const float SwimUpSpeed = 4.5f;
     private const float WaterSinkSpeed = -4f;
+    // Swimming against a wall, Space boosts hard enough to lift the feet a full
+    // block above the surface — SwimUpSpeed alone tops out just below the shore.
+    private const float WaterExitBoost = 7f;
     public const float EyeHeight = 1.62f;
 
     private KeyboardState _previousKeyboard;
+    private bool _againstWall;
 
     /// <summary>Feet position (center of the AABB footprint).</summary>
     public Vector3 Position;
@@ -81,7 +85,7 @@ public class PlayerController
                 Velocity.Z = wish.Z * speed * 0.6f;
                 Velocity.Y = MathF.Max(Velocity.Y + Gravity * 0.35f * dt, WaterSinkSpeed);
                 if (keyboard.IsKeyDown(Keys.Space))
-                    Velocity.Y = SwimUpSpeed;
+                    Velocity.Y = _againstWall ? WaterExitBoost : SwimUpSpeed;
             }
             else
             {
@@ -93,6 +97,6 @@ public class PlayerController
             }
         }
 
-        IsOnGround = PlayerPhysics.MoveWithCollision(ref Position, ref Velocity, world, dt);
+        IsOnGround = PlayerPhysics.MoveWithCollision(ref Position, ref Velocity, world, dt, out _againstWall);
     }
 }
