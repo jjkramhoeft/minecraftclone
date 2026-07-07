@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using MinecraftClone.Items;
 using MinecraftClone.Persistence;
 using MinecraftClone.Player;
 using MinecraftClone.Rendering;
@@ -24,10 +26,12 @@ public class MainGame : Game
     private Hud _hud;
     private TextureAtlas _atlas;
     private Hotbar _hotbar;
+    private Inventory _inventory;
+    private InventoryScreen _inventoryScreen;
+    private PixelFont _font;
 
     private WorldSave _worldSave;
     private int _seed;
-    private int _savedHotbarIndex;
 
     private MouseState _previousMouse;
     private KeyboardState _previousKeyboard;
@@ -55,7 +59,14 @@ public class MainGame : Game
         _worldSave = new WorldSave();
         var meta = _worldSave.TryLoadMetadata();
         _seed = meta?.Seed ?? DefaultSeed;
-        _savedHotbarIndex = meta?.HotbarIndex ?? 0;
+
+        _inventory = new Inventory { SelectedIndex = meta?.HotbarIndex ?? 0 };
+        if (meta?.Inventory != null)
+        {
+            foreach (var slot in meta.Inventory)
+                if (slot.Slot >= 0 && slot.Slot < Inventory.Size)
+                    _inventory[slot.Slot] = new ItemStack((ItemType)slot.Item, slot.Count);
+        }
 
         _camera = new FirstPersonCamera { Yaw = meta?.Yaw ?? 0f, Pitch = meta?.Pitch ?? 0f };
         _camera.UpdateProjection(GraphicsDevice.Viewport.AspectRatio);
@@ -77,32 +88,66 @@ public class MainGame : Game
         _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
         _blockHighlight = new BlockHighlight(GraphicsDevice);
         _hud = new Hud(GraphicsDevice);
-        _hotbar = new Hotbar(GraphicsDevice);
-        _hotbar.Select(_savedHotbarIndex);
+        _font = new PixelFont(GraphicsDevice);
+        _hotbar = new Hotbar(GraphicsDevice, _inventory);
+        _inventoryScreen = new InventoryScreen(GraphicsDevice, _inventory);
     }
 
     protected override void Update(GameTime gameTime)
     {
         var keyboard = Keyboard.GetState();
-        if (keyboard.IsKeyDown(Keys.Escape))
-            Exit();
+        var mouse = Mouse.GetState();
+
+        if (keyboard.IsKeyDown(Keys.Escape) && _previousKeyboard.IsKeyUp(Keys.Escape))
+        {
+            if (_inventoryScreen.IsOpen)
+                ToggleInventoryScreen();
+            else
+                Exit();
+        }
+
+        if (keyboard.IsKeyDown(Keys.E) && _previousKeyboard.IsKeyUp(Keys.E))
+            ToggleInventoryScreen();
 
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        UpdateMouseLook();
-        _player.Update(keyboard, _camera, _chunkManager, dt);
-        _camera.Position = _player.EyePosition;
-        UpdateBlockInteraction();
+        if (_inventoryScreen.IsOpen)
+        {
+            _inventoryScreen.Update(mouse, _previousMouse, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+        }
+        else
+        {
+            UpdateMouseLook();
+            _player.Update(keyboard, _camera, _chunkManager, dt);
+            _camera.Position = _player.EyePosition;
+            UpdateBlockInteraction(keyboard, mouse);
+        }
         _chunkManager.Update(_player.Position);
 
         if (keyboard.IsKeyDown(Keys.F5) && _previousKeyboard.IsKeyUp(Keys.F5))
             SaveWorld();
         _previousKeyboard = keyboard;
+        _previousMouse = mouse;
 
         base.Update(gameTime);
     }
 
+    private void ToggleInventoryScreen()
+    {
+        _inventoryScreen.Toggle();
+        IsMouseVisible = _inventoryScreen.IsOpen;
+        // Prevents the recentering after closing from reading as a huge look delta.
+        _mouseCaptured = false;
+    }
+
     private void SaveWorld()
     {
+        var inventorySlots = new List<InventorySlotData>();
+        for (int i = 0; i < Inventory.Size; i++)
+        {
+            if (!_inventory[i].IsEmpty)
+                inventorySlots.Add(new InventorySlotData { Slot = i, Item = (int)_inventory[i].Item, Count = _inventory[i].Count });
+        }
+
         _chunkManager.SaveAllModified();
         _worldSave.SaveMetadata(new WorldMetadata
         {
@@ -112,8 +157,9 @@ public class MainGame : Game
             PlayerZ = _player.Position.Z,
             Yaw = _camera.Yaw,
             Pitch = _camera.Pitch,
-            HotbarIndex = _hotbar.SelectedIndex,
+            HotbarIndex = _inventory.SelectedIndex,
             IsFlying = _player.IsFlying,
+            Inventory = inventorySlots,
         });
     }
 
@@ -123,11 +169,10 @@ public class MainGame : Game
         base.OnExiting(sender, args);
     }
 
-    private void UpdateBlockInteraction()
+    private void UpdateBlockInteraction(KeyboardState keyboard, MouseState mouse)
     {
-        var mouse = Mouse.GetState();
         if (IsActive)
-            _hotbar.Update(Keyboard.GetState(), mouse);
+            _hotbar.Update(keyboard, mouse);
 
         _targetedBlock = VoxelRaycaster.Cast(_chunkManager, _camera.Position, _camera.Forward, Reach, out var hit)
             ? hit
@@ -140,20 +185,38 @@ public class MainGame : Game
 
             if (leftClick)
             {
+                var broken = _chunkManager.GetBlock(target.X, target.Y, target.Z);
                 _chunkManager.SetBlock(target.X, target.Y, target.Z, BlockType.Air);
+                var drop = ItemInfo.GetDrop(broken);
+                if (drop != ItemType.None)
+                    _inventory.TryAdd(drop); // full inventory = the drop is lost
             }
             else if (rightClick && (target.NormalX != 0 || target.NormalY != 0 || target.NormalZ != 0))
             {
-                int x = target.X + target.NormalX;
-                int y = target.Y + target.NormalY;
-                int z = target.Z + target.NormalZ;
-                // Placing into water replaces it (there's no flow simulation).
-                if (!BlockInfo.IsSolid(_chunkManager.GetBlock(x, y, z)) && !IntersectsPlayer(x, y, z))
-                    _chunkManager.SetBlock(x, y, z, _hotbar.SelectedBlock);
+                TryPlaceBlock(target);
             }
         }
+    }
 
-        _previousMouse = mouse;
+    private void TryPlaceBlock(RaycastHit target)
+    {
+        var stack = _inventory.SelectedStack;
+        if (stack.IsEmpty || !ItemInfo.TryGetBlock(stack.Item, out var blockToPlace))
+            return;
+
+        int x = target.X + target.NormalX;
+        int y = target.Y + target.NormalY;
+        int z = target.Z + target.NormalZ;
+
+        // Placing into water replaces it (there's no flow simulation). SetBlock
+        // silently no-ops on unloaded chunks, so verify before consuming the item.
+        if (BlockInfo.IsSolid(_chunkManager.GetBlock(x, y, z))
+            || IntersectsPlayer(x, y, z)
+            || !_chunkManager.IsChunkLoaded(ChunkManager.ToChunkCoord(new Vector3(x, 0, z))))
+            return;
+
+        _chunkManager.SetBlock(x, y, z, blockToPlace);
+        _inventory.ConsumeFromSlot(_inventory.SelectedIndex);
     }
 
     private bool IntersectsPlayer(int x, int y, int z)
@@ -187,11 +250,17 @@ public class MainGame : Game
     {
         GraphicsDevice.Clear(Color.CornflowerBlue);
 
+        int width = GraphicsDevice.Viewport.Width, height = GraphicsDevice.Viewport.Height;
+
         _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
-        if (_targetedBlock is { } target)
+        if (_targetedBlock is { } target && !_inventoryScreen.IsOpen)
             _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
-        _hud.Draw(_spriteBatch, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
-        _hotbar.Draw(_spriteBatch, _atlas, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+
+        if (!_inventoryScreen.IsOpen)
+            _hud.Draw(_spriteBatch, width, height);
+        _hotbar.Draw(_spriteBatch, _atlas, _font, width, height);
+        if (_inventoryScreen.IsOpen)
+            _inventoryScreen.Draw(_spriteBatch, _atlas, _font, Mouse.GetState(), width, height);
 
         UpdateDebugTitle(gameTime);
         base.Draw(gameTime);

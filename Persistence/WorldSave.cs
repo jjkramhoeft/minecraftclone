@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
@@ -6,9 +7,18 @@ using MinecraftClone.World;
 
 namespace MinecraftClone.Persistence;
 
+public class InventorySlotData
+{
+    public int Slot { get; set; }
+    public int Item { get; set; }
+    public int Count { get; set; }
+}
+
 public class WorldMetadata
 {
-    public int FormatVersion { get; set; } = 1;
+    public const int CurrentFormatVersion = 2; // v2 added Inventory
+
+    public int FormatVersion { get; set; } = CurrentFormatVersion;
     public int Seed { get; set; }
     public float PlayerX { get; set; }
     public float PlayerY { get; set; }
@@ -17,6 +27,9 @@ public class WorldMetadata
     public float Pitch { get; set; }
     public int HotbarIndex { get; set; }
     public bool IsFlying { get; set; }
+
+    /// <summary>Null in pre-v2 saves — treated as an empty inventory.</summary>
+    public List<InventorySlotData> Inventory { get; set; }
 }
 
 /// <summary>
@@ -98,7 +111,14 @@ public class WorldSave
         try
         {
             if (File.Exists(MetadataPath))
-                return JsonSerializer.Deserialize<WorldMetadata>(File.ReadAllText(MetadataPath));
+            {
+                var meta = JsonSerializer.Deserialize<WorldMetadata>(File.ReadAllText(MetadataPath));
+                // Older versions are additive (missing fields default); a file
+                // from a *newer* game version can't be trusted to mean what we
+                // think it means.
+                if (meta != null && meta.FormatVersion <= WorldMetadata.CurrentFormatVersion)
+                    return meta;
+            }
         }
         catch (Exception)
         {

@@ -11,6 +11,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Infinite terrain** that streams in around you on background threads: hills, forests, beaches, and lakes, deterministic from one world seed
 - **First-person movement** with gravity, jumping, collision, sprinting, swimming, and a free-fly mode
 - **Building and digging**: break any block, place grass, dirt, stone, sand, wood, or leaves
+- **Survival-lite inventory**: broken blocks drop items into a 24-slot inventory (`E` to open); placing consumes from the selected hotbar stack
 - **Pixel-style textures** from a procedurally generated texture atlas
 - **Lighting look** from per-face directional shading plus per-vertex ambient occlusion
 - **Distance fog** blending the horizon into the sky
@@ -30,6 +31,7 @@ Mouse and keyboard only.
 | Left click | Break block |
 | Right click | Place block |
 | `1`–`6` / scroll wheel | Select hotbar slot |
+| `E` | Open/close inventory |
 | `F` | Toggle fly mode |
 | `F5` | Save world |
 | `Esc` | Quit |
@@ -86,12 +88,24 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `PlayerPhysics.cs` | Collision of the player's 0.6×1.8×0.6 box against the terrain, resolved one axis at a time; gravity and ground detection |
 | `VoxelRaycaster.cs` | Steps the view ray block-by-block (Amanatides & Woo DDA) to find the targeted block and hit face for breaking/placing |
 
+### `Items\` — what the player holds
+
+| File | Responsibility |
+|---|---|
+| `ItemType.cs` | Every holdable item; ids 0–31 mirror `BlockType` byte values, tools/materials from 32 |
+| `ItemStack.cs` | An item type + count in a slot |
+| `ItemInfo.cs` | Per-item tables: block↔item mapping, stack sizes, tool class/tier, block drops, UI icons |
+| `Inventory.cs` | The player's 24 slots (6×4); slots 0–5 are the hotbar |
+
 ### `UI\` — 2D overlay
 
 | File | Responsibility |
 |---|---|
 | `Hud.cs` | Crosshair |
-| `Hotbar.cs` | Block selection (keys/scroll) and the slot bar rendered from atlas tiles |
+| `Hotbar.cs` | Selected-slot input (keys/scroll) and the hotbar strip, a view over inventory slots 0–5 |
+| `InventoryScreen.cs` | Full inventory overlay (`E`): click to lift/drop/merge/swap stacks |
+| `SlotRenderer.cs` | Shared slot drawing (frame, item icon, stack count) |
+| `PixelFont.cs` | Tiny procedural bitmap font (digits) — the project has no SpriteFont/content pipeline |
 
 ### `Persistence\` — worlds on disk
 
