@@ -42,6 +42,10 @@ public class TextureAtlas
         DrawTool(pixels, BlockInfo.TileStoneAxe, StoneHeadColor, ToolShape.Axe);
         DrawTool(pixels, BlockInfo.TileWoodenShovel, WoodHeadColor, ToolShape.Shovel);
         DrawTool(pixels, BlockInfo.TileStoneShovel, StoneHeadColor, ToolShape.Shovel);
+        DrawCracks(pixels, BlockInfo.TileCrack0, 3);
+        DrawCracks(pixels, BlockInfo.TileCrack1, 6);
+        DrawCracks(pixels, BlockInfo.TileCrack2, 10);
+        DrawCracks(pixels, BlockInfo.TileCrack3, 16);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -219,6 +223,30 @@ public class TextureAtlas
                         if (!((x == 10 || x == 14) && (y == 0 || y == 4)))
                             SetPixel(pixels, tile, x, y, head);
                 break;
+        }
+    }
+
+    /// <summary>Breaking-progress overlay: dark crack strands random-walking out
+    /// from the tile center, denser per stage, on a transparent background.</summary>
+    private static void DrawCracks(Color[] pixels, int tile, int strands)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Color.Transparent);
+
+        var rng = RngFor(tile);
+        var crack = new Color(22, 18, 14, 210);
+        for (int s = 0; s < strands; s++)
+        {
+            int x = 6 + rng.Next(5);
+            int y = 6 + rng.Next(5);
+            int length = 4 + rng.Next(6);
+            for (int i = 0; i < length; i++)
+            {
+                SetPixel(pixels, tile, Math.Clamp(x, 0, TileSize - 1), Math.Clamp(y, 0, TileSize - 1), crack);
+                x += rng.Next(-1, 2);
+                y += rng.Next(-1, 2);
+            }
         }
     }
 

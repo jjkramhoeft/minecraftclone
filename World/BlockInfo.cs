@@ -11,6 +11,15 @@ public enum BlockFace
     West = 5,    // -X
 }
 
+/// <summary>Which kind of tool mines a block efficiently.</summary>
+public enum ToolClass
+{
+    None,
+    Pickaxe,
+    Axe,
+    Shovel,
+}
+
 public static class BlockInfo
 {
     // Atlas tile indices — TextureAtlas generates these tiles, the mesher and
@@ -34,6 +43,10 @@ public static class BlockInfo
     public const int TileStoneAxe = 15;
     public const int TileWoodenShovel = 16;
     public const int TileStoneShovel = 17;
+    public const int TileCrack0 = 18;
+    public const int TileCrack1 = 19;
+    public const int TileCrack2 = 20;
+    public const int TileCrack3 = 21;
 
     /// <summary>Solid blocks collide, block raycasts, and hide neighboring faces.</summary>
     public static bool IsSolid(BlockType type) => type is not (BlockType.Air or BlockType.Water);
@@ -55,5 +68,33 @@ public static class BlockInfo
         BlockType.Planks => TilePlanks,
         BlockType.Bricks => TileBricks,
         _ => TileDirt,
+    };
+
+    /// <summary>Seconds to break by hand (with the right tool acting as a divisor).
+    /// 0 = breaks instantly on click.</summary>
+    public static float GetHardness(BlockType type) => type switch
+    {
+        BlockType.Grass or BlockType.Dirt or BlockType.Sand => 0.75f,
+        BlockType.Leaves => 0.3f,
+        BlockType.Wood => 2f,
+        BlockType.Planks => 1.5f,
+        BlockType.Stone or BlockType.Bricks => 4f,
+        _ => 1f,
+    };
+
+    public static ToolClass GetEffectiveTool(BlockType type) => type switch
+    {
+        BlockType.Stone or BlockType.Bricks => ToolClass.Pickaxe,
+        BlockType.Wood or BlockType.Planks or BlockType.Leaves => ToolClass.Axe,
+        BlockType.Grass or BlockType.Dirt or BlockType.Sand => ToolClass.Shovel,
+        _ => ToolClass.None,
+    };
+
+    /// <summary>Minimum matching-tool tier for the block to drop its item.
+    /// Mining below the tier still breaks the block (slowly) but yields nothing.</summary>
+    public static int GetRequiredTier(BlockType type) => type switch
+    {
+        BlockType.Stone or BlockType.Bricks => 1,
+        _ => 0,
     };
 }

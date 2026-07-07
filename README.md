@@ -13,6 +13,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Building and digging**: break any block, place grass, dirt, stone, sand, wood, or leaves
 - **Survival-lite inventory**: broken blocks drop items into a 24-slot inventory (`E` to open); placing consumes from the selected hotbar stack
 - **Crafting**: a recipe list in the inventory screen — wood into planks and sticks, sand into bricks, and wooden/stone tools
+- **Timed mining**: blocks have hardness, tools have speed; stone needs a pickaxe to drop, and a crack overlay shows breaking progress
 - **Pixel-style textures** from a procedurally generated texture atlas
 - **Lighting look** from per-face directional shading plus per-vertex ambient occlusion
 - **Distance fog** blending the horizon into the sky
@@ -29,7 +30,7 @@ Mouse and keyboard only.
 | `Space` | Jump / swim up (fly up in fly mode) |
 | `Left Shift` | Fly down (fly mode) |
 | `Left Ctrl` | Sprint |
-| Left click | Break block |
+| Left click (hold) | Mine block — speed depends on block hardness and the held tool |
 | Right click | Place block |
 | `1`–`6` / scroll wheel | Select hotbar slot |
 | `E` | Open/close inventory |
@@ -80,12 +81,14 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `TextureAtlas.cs` | Generates the 256×256 block texture atlas in code at startup and maps tile indices to UV rectangles |
 | `WorldRenderer.cs` | Draws all visible chunk meshes: frustum culling, distance fog, an opaque pass, then a blended water pass |
 | `BlockHighlight.cs` | Wireframe outline around the block under the crosshair |
+| `BreakingOverlay.cs` | Crack texture drawn over the block being mined, staged by progress |
 
 ### `Player\` — input, physics, interaction
 
 | File | Responsibility |
 |---|---|
 | `PlayerController.cs` | Turns keyboard input into movement intent: walking, sprinting, jumping, swimming, and the fly-mode toggle |
+| `BlockInteraction.cs` | Crosshair targeting, timed mining (hardness × tool speed/tier), drops, and placement |
 | `PlayerPhysics.cs` | Collision of the player's 0.6×1.8×0.6 box against the terrain, resolved one axis at a time; gravity and ground detection |
 | `VoxelRaycaster.cs` | Steps the view ray block-by-block (Amanatides & Woo DDA) to find the targeted block and hit face for breaking/placing |
 

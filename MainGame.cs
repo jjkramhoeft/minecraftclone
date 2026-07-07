@@ -14,7 +14,6 @@ namespace MinecraftClone;
 public class MainGame : Game
 {
     private const int DefaultSeed = 12345;
-    private const float Reach = 5f;
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
@@ -22,7 +21,9 @@ public class MainGame : Game
     private WorldRenderer _worldRenderer;
     private ChunkManager _chunkManager;
     private PlayerController _player;
+    private BlockInteraction _blockInteraction;
     private BlockHighlight _blockHighlight;
+    private BreakingOverlay _breakingOverlay;
     private Hud _hud;
     private TextureAtlas _atlas;
     private Hotbar _hotbar;
@@ -35,7 +36,6 @@ public class MainGame : Game
 
     private MouseState _previousMouse;
     private KeyboardState _previousKeyboard;
-    private RaycastHit? _targetedBlock;
 
     private double _titleTimer;
     private int _frames;
@@ -87,6 +87,8 @@ public class MainGame : Game
         _worldRenderer = new WorldRenderer(GraphicsDevice, _atlas);
         _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
         _blockHighlight = new BlockHighlight(GraphicsDevice);
+        _breakingOverlay = new BreakingOverlay(GraphicsDevice, _atlas);
+        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player);
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
@@ -119,7 +121,9 @@ public class MainGame : Game
             UpdateMouseLook();
             _player.Update(keyboard, _camera, _chunkManager, dt);
             _camera.Position = _player.EyePosition;
-            UpdateBlockInteraction(keyboard, mouse);
+            if (IsActive)
+                _hotbar.Update(keyboard, mouse);
+            _blockInteraction.Update(_camera, mouse, _previousMouse, IsActive && _mouseCaptured, dt);
         }
         _chunkManager.Update(_player.Position);
 
@@ -169,64 +173,6 @@ public class MainGame : Game
         base.OnExiting(sender, args);
     }
 
-    private void UpdateBlockInteraction(KeyboardState keyboard, MouseState mouse)
-    {
-        if (IsActive)
-            _hotbar.Update(keyboard, mouse);
-
-        _targetedBlock = VoxelRaycaster.Cast(_chunkManager, _camera.Position, _camera.Forward, Reach, out var hit)
-            ? hit
-            : null;
-
-        if (IsActive && _mouseCaptured && _targetedBlock is { } target)
-        {
-            bool leftClick = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
-            bool rightClick = mouse.RightButton == ButtonState.Pressed && _previousMouse.RightButton == ButtonState.Released;
-
-            if (leftClick)
-            {
-                var broken = _chunkManager.GetBlock(target.X, target.Y, target.Z);
-                _chunkManager.SetBlock(target.X, target.Y, target.Z, BlockType.Air);
-                var drop = ItemInfo.GetDrop(broken);
-                if (drop != ItemType.None)
-                    _inventory.TryAdd(drop); // full inventory = the drop is lost
-            }
-            else if (rightClick && (target.NormalX != 0 || target.NormalY != 0 || target.NormalZ != 0))
-            {
-                TryPlaceBlock(target);
-            }
-        }
-    }
-
-    private void TryPlaceBlock(RaycastHit target)
-    {
-        var stack = _inventory.SelectedStack;
-        if (stack.IsEmpty || !ItemInfo.TryGetBlock(stack.Item, out var blockToPlace))
-            return;
-
-        int x = target.X + target.NormalX;
-        int y = target.Y + target.NormalY;
-        int z = target.Z + target.NormalZ;
-
-        // Placing into water replaces it (there's no flow simulation). SetBlock
-        // silently no-ops on unloaded chunks, so verify before consuming the item.
-        if (BlockInfo.IsSolid(_chunkManager.GetBlock(x, y, z))
-            || IntersectsPlayer(x, y, z)
-            || !_chunkManager.IsChunkLoaded(ChunkManager.ToChunkCoord(new Vector3(x, 0, z))))
-            return;
-
-        _chunkManager.SetBlock(x, y, z, blockToPlace);
-        _inventory.ConsumeFromSlot(_inventory.SelectedIndex);
-    }
-
-    private bool IntersectsPlayer(int x, int y, int z)
-    {
-        var p = _player.Position;
-        return x + 1 > p.X - PlayerPhysics.HalfWidth && x < p.X + PlayerPhysics.HalfWidth
-            && y + 1 > p.Y && y < p.Y + PlayerPhysics.Height
-            && z + 1 > p.Z - PlayerPhysics.HalfWidth && z < p.Z + PlayerPhysics.HalfWidth;
-    }
-
     private void UpdateMouseLook()
     {
         if (!IsActive)
@@ -253,8 +199,16 @@ public class MainGame : Game
         int width = GraphicsDevice.Viewport.Width, height = GraphicsDevice.Viewport.Height;
 
         _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
-        if (_targetedBlock is { } target && !_inventoryScreen.IsOpen)
-            _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
+        if (!_inventoryScreen.IsOpen)
+        {
+            if (_blockInteraction.IsMining)
+            {
+                var pos = _blockInteraction.MiningPos;
+                _breakingOverlay.Draw(GraphicsDevice, _camera, pos, _blockInteraction.BreakProgress);
+            }
+            if (_blockInteraction.Target is { } target)
+                _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
+        }
 
         if (!_inventoryScreen.IsOpen)
             _hud.Draw(_spriteBatch, width, height);

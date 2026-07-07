@@ -2,14 +2,6 @@ using MinecraftClone.World;
 
 namespace MinecraftClone.Items;
 
-public enum ToolClass
-{
-    None,
-    Pickaxe,
-    Axe,
-    Shovel,
-}
-
 /// <summary>Static per-item data, in the BlockInfo style. Items reference the
 /// World layer (never the other way around).</summary>
 public static class ItemInfo
