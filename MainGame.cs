@@ -25,6 +25,7 @@ public class MainGame : Game
     private BlockInteraction _blockInteraction;
     private BlockHighlight _blockHighlight;
     private BreakingOverlay _breakingOverlay;
+    private PlayerModel _playerModel;
     private Hud _hud;
     private TextureAtlas _atlas;
     private Hotbar _hotbar;
@@ -91,6 +92,8 @@ public class MainGame : Game
         _breakingOverlay = new BreakingOverlay(GraphicsDevice, _atlas);
         _blockUpdater = new BlockUpdater();
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
+        _playerModel = new PlayerModel(GraphicsDevice, _atlas);
+        _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
@@ -129,6 +132,7 @@ public class MainGame : Game
         }
         _chunkManager.Update(_player.Position);
         _blockUpdater.Update(_chunkManager, dt);
+        _playerModel.Update(_player, dt, !_inventoryScreen.IsOpen && _blockInteraction.IsMining);
 
         if (keyboard.IsKeyDown(Keys.F5) && _previousKeyboard.IsKeyUp(Keys.F5))
             SaveWorld();
@@ -212,6 +216,7 @@ public class MainGame : Game
             if (_blockInteraction.Target is { } target)
                 _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
         }
+        _playerModel.DrawFirstPersonArm(_camera);
 
         if (!_inventoryScreen.IsOpen)
             _hud.Draw(_spriteBatch, width, height);

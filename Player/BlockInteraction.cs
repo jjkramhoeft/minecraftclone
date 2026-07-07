@@ -29,6 +29,9 @@ public class BlockInteraction
     /// <summary>The block under the crosshair, if any (within reach).</summary>
     public RaycastHit? Target { get; private set; }
 
+    /// <summary>Fired on every completed break or successful place (arm swing hook).</summary>
+    public event Action ActionPerformed;
+
     public float BreakProgress => _progress;
     public (int X, int Y, int Z) MiningPos => _miningPos;
     public bool IsMining => _progress > 0f;
@@ -112,6 +115,7 @@ public class BlockInteraction
         _world.SetBlock(target.X, target.Y, target.Z, BlockType.Air);
         _blockUpdater.NotifyBlockChanged(target.X, target.Y, target.Z);
         _progress = 0f;
+        ActionPerformed?.Invoke();
 
         if (dropAllowed)
         {
@@ -149,6 +153,7 @@ public class BlockInteraction
         _world.SetBlock(x, y, z, blockToPlace);
         _blockUpdater.NotifyBlockChanged(x, y, z);
         _inventory.ConsumeFromSlot(_inventory.SelectedIndex);
+        ActionPerformed?.Invoke();
     }
 
     private bool IntersectsPlayer(int x, int y, int z)

@@ -50,6 +50,11 @@ public static class BlockInfo
     public const int TileFlowerRed = 22;
     public const int TileFlowerYellow = 23;
     public const int TileFlowerPoppy = 24;
+    // Player character skin (UI/model only, never on block faces)
+    public const int TileSkin = 25;
+    public const int TileShirt = 26;
+    public const int TilePants = 27;
+    public const int TileFace = 28;
 
     /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
     /// occlusion. Flowers are deliberately NOT solid — you walk through them.</summary>

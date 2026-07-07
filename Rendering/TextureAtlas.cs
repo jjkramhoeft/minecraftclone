@@ -49,6 +49,10 @@ public class TextureAtlas
         DrawFlower(pixels, BlockInfo.TileFlowerRed, new Color(214, 48, 44));
         DrawFlower(pixels, BlockInfo.TileFlowerYellow, new Color(238, 210, 60));
         DrawFlower(pixels, BlockInfo.TileFlowerPoppy, new Color(238, 238, 230));
+        DrawSpeckled(pixels, BlockInfo.TileSkin, new Color(224, 180, 145), 5);
+        DrawSpeckled(pixels, BlockInfo.TileShirt, new Color(66, 150, 178), 7);
+        DrawSpeckled(pixels, BlockInfo.TilePants, new Color(58, 68, 118), 6);
+        DrawFace(pixels);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -227,6 +231,25 @@ public class TextureAtlas
                             SetPixel(pixels, tile, x, y, head);
                 break;
         }
+    }
+
+    /// <summary>The head's front tile: skin with eyes and a hint of a mouth.</summary>
+    private static void DrawFace(Color[] pixels)
+    {
+        var rng = RngFor(BlockInfo.TileFace);
+        var skin = new Color(224, 180, 145);
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, BlockInfo.TileFace, x, y, Jitter(rng, skin, 5));
+
+        var eye = new Color(48, 40, 82);
+        SetPixel(pixels, BlockInfo.TileFace, 4, 6, eye);
+        SetPixel(pixels, BlockInfo.TileFace, 5, 6, eye);
+        SetPixel(pixels, BlockInfo.TileFace, 10, 6, eye);
+        SetPixel(pixels, BlockInfo.TileFace, 11, 6, eye);
+        var mouth = new Color(178, 128, 100);
+        SetPixel(pixels, BlockInfo.TileFace, 7, 11, mouth);
+        SetPixel(pixels, BlockInfo.TileFace, 8, 11, mouth);
     }
 
     /// <summary>Flower sprite for the cross-quad cutout mesh: transparent
