@@ -116,6 +116,9 @@ public class MainGame : Game
         if (keyboard.IsKeyDown(Keys.E) && _previousKeyboard.IsKeyUp(Keys.E))
             ToggleInventoryScreen();
 
+        if (keyboard.IsKeyDown(Keys.V) && _previousKeyboard.IsKeyUp(Keys.V))
+            _camera.ThirdPerson = !_camera.ThirdPerson;
+
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         if (_inventoryScreen.IsOpen)
         {
@@ -125,7 +128,7 @@ public class MainGame : Game
         {
             UpdateMouseLook();
             _player.Update(keyboard, _camera, _chunkManager, dt);
-            _camera.Position = _player.EyePosition;
+            _camera.Position = ComputeCameraPosition();
             if (IsActive)
                 _hotbar.Update(keyboard, mouse);
             _blockInteraction.Update(_camera, mouse, _previousMouse, IsActive && _mouseCaptured, dt);
@@ -140,6 +143,20 @@ public class MainGame : Game
         _previousMouse = mouse;
 
         base.Update(gameTime);
+    }
+
+    private Vector3 ComputeCameraPosition()
+    {
+        var eye = _player.EyePosition;
+        if (!_camera.ThirdPerson)
+            return eye;
+
+        // Boom straight back from the eye, pulled in when terrain would
+        // occlude it so the camera never ends up inside a block.
+        float boom = _camera.ThirdPersonDistance;
+        if (VoxelRaycaster.Cast(_chunkManager, eye, -_camera.Forward, boom, out var occluder, includeFlowers: false))
+            boom = System.MathF.Max(0.3f, occluder.Distance - 0.25f);
+        return eye - _camera.Forward * boom;
     }
 
     private void ToggleInventoryScreen()
@@ -216,7 +233,11 @@ public class MainGame : Game
             if (_blockInteraction.Target is { } target)
                 _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
         }
-        _playerModel.DrawFirstPersonArm(_camera);
+
+        if (_camera.ThirdPerson)
+            _playerModel.DrawBody(_camera, _player.Position, _camera.Yaw, _camera.Pitch);
+        else
+            _playerModel.DrawFirstPersonArm(_camera);
 
         if (!_inventoryScreen.IsOpen)
             _hud.Draw(_spriteBatch, width, height);

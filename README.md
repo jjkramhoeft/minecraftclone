@@ -16,6 +16,8 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Timed mining**: blocks have hardness, tools have speed; stone needs a pickaxe to drop, and a crack overlay shows breaking progress
 - **Falling sand**: gravity blocks drop cell-by-cell when their support is removed, cascading whole columns
 - **Flowers**: three decorative variants scattered on grass, breakable/plantable (on grass or dirt), drawn as cross-quads in an alpha-test pass
+- **A visible player character**: an animated blocky figure — you see its arm swing in first person and the whole walking body in third person
+- **Dual camera**: first-person or over-the-shoulder third person (`V`), with the camera boom pulling in so terrain never occludes the view
 - **Pixel-style textures** from a procedurally generated texture atlas
 - **Lighting look** from per-face directional shading plus per-vertex ambient occlusion
 - **Distance fog** blending the horizon into the sky
@@ -36,6 +38,7 @@ Mouse and keyboard only.
 | Right click | Place block |
 | `1`–`6` / scroll wheel | Select hotbar slot |
 | `E` | Open/close inventory |
+| `V` | Toggle first/third-person camera |
 | `F` | Toggle fly mode |
 | `F5` | Save world |
 | `Esc` | Quit |
@@ -78,7 +81,8 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 
 | File | Responsibility |
 |---|---|
-| `FirstPersonCamera.cs` | Yaw/pitch mouse-look camera; provides view/projection matrices and the direction vectors movement and raycasting use |
+| `FirstPersonCamera.cs` | Yaw/pitch mouse-look camera with an optional third-person boom; provides view/projection matrices and the direction vectors movement and raycasting use |
+| `PlayerModel.cs` | The blocky player character: six textured boxes, walk-cycle and swing animation, first-person arm and third-person body |
 | `ChunkMesher.cs` | Turns a chunk's blocks into vertex/index arrays: one quad per face bordering a non-solid block, with per-face shading and per-vertex ambient occlusion; water goes into a separate list for the transparent pass. Pure CPU code, safe on worker threads |
 | `ChunkMesh.cs` | GPU buffers for one chunk (opaque + optional water set); created and disposed on the main thread only |
 | `TextureAtlas.cs` | Generates the 256×256 block texture atlas in code at startup and maps tile indices to UV rectangles |

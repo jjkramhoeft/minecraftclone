@@ -46,7 +46,10 @@ public class BlockInteraction
 
     public void Update(FirstPersonCamera camera, MouseState mouse, MouseState previousMouse, bool allowInput, float dt)
     {
-        Target = VoxelRaycaster.Cast(_world, camera.Position, camera.Forward, Reach, out var hit)
+        // Always from the player's eye, not the camera: in third person the
+        // camera hangs back on a boom, and aiming from there would gift extra
+        // reach and let you mine blocks behind your own head.
+        Target = VoxelRaycaster.Cast(_world, _player.EyePosition, camera.Forward, Reach, out var hit)
             ? hit
             : null;
 

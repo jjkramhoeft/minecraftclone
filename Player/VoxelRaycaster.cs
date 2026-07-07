@@ -4,8 +4,9 @@ using MinecraftClone.World;
 
 namespace MinecraftClone.Player;
 
-/// <summary>The solid block a ray hit, plus the face it entered through (unit normal).</summary>
-public readonly record struct RaycastHit(int X, int Y, int Z, int NormalX, int NormalY, int NormalZ);
+/// <summary>The block a ray hit, the face it entered through (unit normal),
+/// and how far along the ray the hit is.</summary>
+public readonly record struct RaycastHit(int X, int Y, int Z, int NormalX, int NormalY, int NormalZ, float Distance);
 
 /// <summary>
 /// Voxel ray marching using the Amanatides &amp; Woo DDA algorithm: steps the ray
@@ -14,16 +15,20 @@ public readonly record struct RaycastHit(int X, int Y, int Z, int NormalX, int N
 /// </summary>
 public static class VoxelRaycaster
 {
-    public static bool Cast(ChunkManager world, Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit hit)
+    /// <param name="includeFlowers">False restricts hits to solid blocks —
+    /// used by the third-person camera boom, which shouldn't stop at flowers.</param>
+    public static bool Cast(ChunkManager world, Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit hit, bool includeFlowers = true)
     {
         int x = (int)MathF.Floor(origin.X);
         int y = (int)MathF.Floor(origin.Y);
         int z = (int)MathF.Floor(origin.Z);
 
+        bool Hits(BlockType type) => includeFlowers ? BlockInfo.IsTargetable(type) : BlockInfo.IsSolid(type);
+
         // Degenerate but possible: the eye is inside a targetable block.
-        if (BlockInfo.IsTargetable(world.GetBlock(x, y, z)))
+        if (Hits(world.GetBlock(x, y, z)))
         {
-            hit = new RaycastHit(x, y, z, 0, 0, 0);
+            hit = new RaycastHit(x, y, z, 0, 0, 0, 0f);
             return true;
         }
 
@@ -71,9 +76,9 @@ public static class VoxelRaycaster
                 return false;
             }
 
-            if (BlockInfo.IsTargetable(world.GetBlock(x, y, z)))
+            if (Hits(world.GetBlock(x, y, z)))
             {
-                hit = new RaycastHit(x, y, z, nx, ny, nz);
+                hit = new RaycastHit(x, y, z, nx, ny, nz, t);
                 return true;
             }
         }

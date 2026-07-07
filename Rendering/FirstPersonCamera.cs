@@ -11,6 +11,12 @@ public class FirstPersonCamera
 
     public Vector3 Position { get; set; }
 
+    /// <summary>Over-the-shoulder mode: the camera hangs back along -Forward
+    /// from the player's eye (V toggles). Look math is unchanged.</summary>
+    public bool ThirdPerson { get; set; }
+
+    public float ThirdPersonDistance { get; set; } = 3.5f;
+
     /// <summary>Rotation around the Y axis in radians. 0 looks toward +Z; increasing yaw turns left.</summary>
     public float Yaw { get; set; }
 
