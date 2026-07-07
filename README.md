@@ -14,7 +14,7 @@ Each phase produces something runnable. Checked boxes are done.
 - [x] **Phase 5 — Break & place blocks**: DDA raycast from the crosshair, left-click break, right-click place, block highlight
 - [x] **Phase 6 — Textures, block variety, hotbar**: procedural texture atlas; grass, dirt, stone, sand, wood, leaves; hotbar selection
 - [x] **Phase 7 — Save & load**: modified chunks persist to disk, world seed + player position saved
-- [ ] **Phase 8 — Polish (optional)**: distance fog, frustum culling, water, ambient occlusion, sounds
+- [x] **Phase 8 — Polish**: distance fog, frustum culling, water (still, no flow), per-vertex ambient occlusion, sprint & swimming (sounds left out — no audio assets)
 
 ## Controls (planned)
 
@@ -22,8 +22,9 @@ Each phase produces something runnable. Checked boxes are done.
 |---|---|
 | `W A S D` | Move |
 | Mouse | Look around |
-| `Space` | Jump (fly up in fly mode) |
+| `Space` | Jump / swim up (fly up in fly mode) |
 | `Left Shift` | Fly down (fly mode) |
+| `Left Ctrl` | Sprint |
 | Left click | Break block |
 | Right click | Place block |
 | `1`–`6` / scroll wheel | Select hotbar slot |
@@ -69,6 +70,7 @@ Load-bearing design decisions (so future-me doesn't relitigate them):
 - **Block edits remesh synchronously** on the main thread (a chunk meshes in well under 2 ms) so breaking/placing feels instant.
 - **Textures are generated in code** at startup — a 256×256 atlas of 16×16 tiles with per-tile color + noise speckle. No art assets, and no MonoGame content pipeline (MGCB) involvement.
 - **Only player-modified chunks are saved.** Everything else regenerates deterministically from the world seed.
+- **Water is still**: it renders semi-transparent in a second pass and you swim in it, but there is no flow simulation — breaking a block under water leaves air.
 
 ## Save format
 

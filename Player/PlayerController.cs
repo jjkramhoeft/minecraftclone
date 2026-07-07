@@ -13,11 +13,14 @@ namespace MinecraftClone.Player;
 public class PlayerController
 {
     private const float WalkSpeed = 4.5f;
+    private const float SprintMultiplier = 1.6f;
     private const float FlySpeed = 12f;
     private const float FlyVerticalSpeed = 10f;
     private const float JumpVelocity = 8.5f;
     private const float Gravity = -25f;
     private const float TerminalVelocity = -50f;
+    private const float SwimUpSpeed = 4.5f;
+    private const float WaterSinkSpeed = -4f;
     public const float EyeHeight = 1.62f;
 
     private KeyboardState _previousKeyboard;
@@ -65,11 +68,29 @@ public class PlayerController
         }
         else
         {
-            Velocity.X = wish.X * WalkSpeed;
-            Velocity.Z = wish.Z * WalkSpeed;
-            Velocity.Y = MathF.Max(Velocity.Y + Gravity * dt, TerminalVelocity);
-            if (IsOnGround && keyboard.IsKeyDown(Keys.Space))
-                Velocity.Y = JumpVelocity;
+            float speed = WalkSpeed * (keyboard.IsKeyDown(Keys.LeftControl) ? SprintMultiplier : 1f);
+            bool inWater = world.GetBlock(
+                (int)MathF.Floor(Position.X),
+                (int)MathF.Floor(Position.Y + 0.6f),
+                (int)MathF.Floor(Position.Z)) == BlockType.Water;
+
+            if (inWater)
+            {
+                // Buoyancy: slow sinking, and Space swims up regardless of ground.
+                Velocity.X = wish.X * speed * 0.6f;
+                Velocity.Z = wish.Z * speed * 0.6f;
+                Velocity.Y = MathF.Max(Velocity.Y + Gravity * 0.35f * dt, WaterSinkSpeed);
+                if (keyboard.IsKeyDown(Keys.Space))
+                    Velocity.Y = SwimUpSpeed;
+            }
+            else
+            {
+                Velocity.X = wish.X * speed;
+                Velocity.Z = wish.Z * speed;
+                Velocity.Y = MathF.Max(Velocity.Y + Gravity * dt, TerminalVelocity);
+                if (IsOnGround && keyboard.IsKeyDown(Keys.Space))
+                    Velocity.Y = JumpVelocity;
+            }
         }
 
         IsOnGround = PlayerPhysics.MoveWithCollision(ref Position, ref Velocity, world, dt);

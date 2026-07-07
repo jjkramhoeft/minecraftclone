@@ -32,6 +32,7 @@ public class TextureAtlas
         DrawBark(pixels);
         DrawWoodTop(pixels);
         DrawLeaves(pixels);
+        DrawSpeckled(pixels, BlockInfo.TileWater, new Color(58, 110, 216), 10);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);

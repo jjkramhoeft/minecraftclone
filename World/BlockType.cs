@@ -9,4 +9,5 @@ public enum BlockType : byte
     Sand,
     Wood,
     Leaves,
+    Water,
 }

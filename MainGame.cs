@@ -147,7 +147,8 @@ public class MainGame : Game
                 int x = target.X + target.NormalX;
                 int y = target.Y + target.NormalY;
                 int z = target.Z + target.NormalZ;
-                if (_chunkManager.GetBlock(x, y, z) == BlockType.Air && !IntersectsPlayer(x, y, z))
+                // Placing into water replaces it (there's no flow simulation).
+                if (!BlockInfo.IsSolid(_chunkManager.GetBlock(x, y, z)) && !IntersectsPlayer(x, y, z))
                     _chunkManager.SetBlock(x, y, z, _hotbar.SelectedBlock);
             }
         }

@@ -21,7 +21,7 @@ namespace MinecraftClone.World;
 public class ChunkManager : IDisposable
 {
     public const int LoadRadius = 8;                        // chunks that get meshes
-    private const int GenerateRadius = LoadRadius + 1;      // chunks with block data (border culling needs +1)
+    private const int GenerateRadius = LoadRadius + 2;      // meshing needs all 8 neighbors (AO reads diagonals)
     private const int UnloadRadius = LoadRadius + 3;        // beyond this, chunks are dropped
     private const int MeshUploadsPerFrame = 4;              // GPU buffer creations per frame, to avoid hitches
     private const int GenerateIntegrationsPerFrame = 64;    // cheap dictionary adds, higher budget
@@ -219,44 +219,44 @@ public class ChunkManager : IDisposable
 
     private bool TryGetNeighbors(ChunkCoord coord, out NeighborChunks neighbors)
     {
-        if (_chunks.TryGetValue(new ChunkCoord(coord.X, coord.Z - 1), out var north)
-            && _chunks.TryGetValue(new ChunkCoord(coord.X, coord.Z + 1), out var south)
-            && _chunks.TryGetValue(new ChunkCoord(coord.X + 1, coord.Z), out var east)
-            && _chunks.TryGetValue(new ChunkCoord(coord.X - 1, coord.Z), out var west))
+        var grid = new Chunk[9];
+        for (int dz = -1; dz <= 1; dz++)
         {
-            neighbors = new NeighborChunks(north, south, east, west);
-            return true;
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                if (!_chunks.TryGetValue(new ChunkCoord(coord.X + dx, coord.Z + dz), out var chunk))
+                {
+                    neighbors = default;
+                    return false;
+                }
+                grid[dx + 1 + (dz + 1) * 3] = chunk;
+            }
         }
-        neighbors = default;
-        return false;
+        neighbors = new NeighborChunks(grid);
+        return true;
     }
 
     /// <summary>
-    /// The four face neighbors of a chunk, captured at schedule time so mesher
-    /// workers never read the (main-thread-owned) chunk dictionary.
+    /// The 3x3 grid of chunks around (and including) the one being meshed,
+    /// captured at schedule time so mesher workers never read the
+    /// (main-thread-owned) chunk dictionary. Ambient occlusion samples diagonal
+    /// neighbors, so all 8 surrounding chunks are required.
     /// </summary>
     private readonly struct NeighborChunks
     {
-        private readonly Chunk _north, _south, _east, _west;
+        private readonly Chunk[] _grid;
 
-        public NeighborChunks(Chunk north, Chunk south, Chunk east, Chunk west)
-        {
-            _north = north;
-            _south = south;
-            _east = east;
-            _west = west;
-        }
+        public NeighborChunks(Chunk[] grid) => _grid = grid;
 
-        // Sampler for chunk-local coordinates just outside the meshed chunk.
-        // Face-neighbor lookups only ever leave the chunk along one axis.
+        // Sampler for chunk-local coordinates up to one chunk outside the
+        // meshed chunk in X and/or Z.
         public BlockType Sample(int x, int y, int z)
         {
-            if (y < 0 || y >= Chunk.SizeY) return BlockType.Air;
-            if (x < 0) return _west.GetBlock(x + Chunk.SizeX, y, z);
-            if (x >= Chunk.SizeX) return _east.GetBlock(x - Chunk.SizeX, y, z);
-            if (z < 0) return _north.GetBlock(x, y, z + Chunk.SizeZ);
-            if (z >= Chunk.SizeZ) return _south.GetBlock(x, y, z - Chunk.SizeZ);
-            return BlockType.Air;
+            if (y < 0 || y >= Chunk.SizeY)
+                return BlockType.Air;
+            int gridX = (x + Chunk.SizeX) >> 4;
+            int gridZ = (z + Chunk.SizeZ) >> 4;
+            return _grid[gridX + gridZ * 3].GetBlock(x & 15, y, z & 15);
         }
     }
 

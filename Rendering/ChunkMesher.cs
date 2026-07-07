@@ -7,15 +7,21 @@ using MinecraftClone.World;
 namespace MinecraftClone.Rendering;
 
 /// <summary>CPU-side mesh: safe to build on a worker thread, uploaded to the GPU by ChunkMesh.</summary>
-public record MeshData(VertexPositionColorTexture[] Vertices, int[] Indices)
+public record MeshData(
+    VertexPositionColorTexture[] Vertices, int[] Indices,
+    VertexPositionColorTexture[] WaterVertices, int[] WaterIndices)
 {
-    public bool IsEmpty => Indices.Length == 0;
+    public bool IsEmpty => Indices.Length == 0 && WaterIndices.Length == 0;
 }
 
 /// <summary>
-/// Naive culled meshing: one quad per solid-block face that borders a non-solid block.
-/// Vertices are in chunk-local coordinates; ChunkMesh translates to world position.
-/// Pure CPU work — no GraphicsDevice access, so it can run on worker threads.
+/// Naive culled meshing: one quad per block face that borders a non-solid block,
+/// with per-vertex ambient occlusion. Water goes into a separate vertex list so
+/// the renderer can draw it in a transparent pass after the opaque terrain.
+/// Vertices are in chunk-local coordinates; ChunkMesh translates to world
+/// position. Pure CPU work — no GraphicsDevice access, so it can run on worker
+/// threads. The outside sampler must handle diagonal excursions (AO reads
+/// corner neighbors), i.e. up to one chunk away in both X and Z at once.
 /// </summary>
 public static class ChunkMesher
 {
@@ -27,6 +33,8 @@ public static class ChunkMesher
 
     // Corner offsets from the block's min corner, wound clockwise viewed from
     // outside (front-facing under the default CullCounterClockwiseFace state).
+    // Side faces run (bottom-left, bottom-right, top-right, top-left) so the
+    // texture v axis maps top-of-tile → top-of-block.
     private static readonly Vector3[][] FaceCorners =
     {
         new[] { new Vector3(0, 1, 0), new Vector3(1, 1, 0), new Vector3(1, 1, 1), new Vector3(0, 1, 1) }, // Top
@@ -37,18 +45,34 @@ public static class ChunkMesher
         new[] { new Vector3(0, 0, 1), new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 1, 1) }, // West
     };
 
+    // The two in-plane axes per face (0=X, 1=Y, 2=Z), used for AO neighbor lookups.
+    private static readonly (int U, int V)[] FaceTangents =
+    {
+        (0, 2), (0, 2), (0, 1), (0, 1), (1, 2), (1, 2),
+    };
+
     // Fake directional light: constant brightness per face orientation.
     private static readonly float[] FaceShade = { 1f, 0.5f, 0.8f, 0.8f, 0.65f, 0.65f };
 
+    // Brightness per ambient-occlusion level (0 = fully occluded corner).
+    private static readonly float[] AoFactor = { 0.55f, 0.7f, 0.85f, 1f };
+
+    private const byte WaterAlpha = 160;
+
     /// <param name="chunk">The chunk to mesh.</param>
     /// <param name="getOutsideBlock">
-    /// Sampler for chunk-local coordinates outside this chunk's bounds (border culling).
-    /// Phase 2 passes "always Air"; Phase 3 resolves through neighboring chunks.
+    /// Sampler for chunk-local coordinates outside this chunk's bounds — must
+    /// resolve all 8 surrounding chunks (AO samples diagonals).
     /// </param>
     public static MeshData Build(Chunk chunk, Func<int, int, int, BlockType> getOutsideBlock)
     {
         var vertices = new List<VertexPositionColorTexture>();
         var indices = new List<int>();
+        var waterVertices = new List<VertexPositionColorTexture>();
+        var waterIndices = new List<int>();
+
+        BlockType Sample(int x, int y, int z) =>
+            Chunk.InBounds(x, y, z) ? chunk.GetBlock(x, y, z) : getOutsideBlock(x, y, z);
 
         for (int y = 0; y < Chunk.SizeY; y++)
         {
@@ -63,35 +87,97 @@ public static class ChunkMesher
                     for (int face = 0; face < 6; face++)
                     {
                         var (nx, ny, nz) = FaceNormals[face];
-                        int bx = x + nx, by = y + ny, bz = z + nz;
-                        var neighbor = Chunk.InBounds(bx, by, bz)
-                            ? chunk.GetBlock(bx, by, bz)
-                            : getOutsideBlock(bx, by, bz);
-                        if (BlockInfo.IsSolid(neighbor))
-                            continue;
+                        var neighbor = Sample(x + nx, y + ny, z + nz);
 
-                        AddFace(vertices, indices, new Vector3(x, y, z), face, type);
+                        if (type == BlockType.Water)
+                        {
+                            // Water surfaces only show against air; solid
+                            // neighbors hide it and water-water is interior.
+                            if (neighbor == BlockType.Air)
+                                AddWaterFace(waterVertices, waterIndices, x, y, z, face);
+                        }
+                        else if (!BlockInfo.IsSolid(neighbor))
+                        {
+                            AddFace(vertices, indices, x, y, z, face, type, Sample);
+                        }
                     }
                 }
             }
         }
 
-        return new MeshData(vertices.ToArray(), indices.ToArray());
+        return new MeshData(vertices.ToArray(), indices.ToArray(), waterVertices.ToArray(), waterIndices.ToArray());
     }
 
-    private static void AddFace(List<VertexPositionColorTexture> vertices, List<int> indices, Vector3 blockPos, int face, BlockType type)
+    private static void AddFace(List<VertexPositionColorTexture> vertices, List<int> indices,
+        int bx, int by, int bz, int face, BlockType type, Func<int, int, int, BlockType> sample)
     {
-        // The face brightness rides in the vertex color; BasicEffect multiplies
-        // it with the sampled atlas texel.
-        byte shade = (byte)(255 * FaceShade[face]);
-        var color = new Color(shade, shade, shade);
-
+        float shade = FaceShade[face];
         var uv = TextureAtlas.GetUVBounds(BlockInfo.GetFaceTile(type, (BlockFace)face));
+        Span<Vector2> uvs = stackalloc Vector2[]
+        {
+            new(uv.X, uv.W), new(uv.Z, uv.W), new(uv.Z, uv.Y), new(uv.X, uv.Y),
+        };
 
-        // FaceCorners order is (bottom-left, bottom-right, top-right, top-left)
-        // for the side faces, so v runs top-of-tile → top-of-block.
-        int baseIndex = vertices.Count;
+        var (nx, ny, nz) = FaceNormals[face];
+        var (uAxis, vAxis) = FaceTangents[face];
+        var blockPos = new Vector3(bx, by, bz);
         var corners = FaceCorners[face];
+
+        int baseIndex = vertices.Count;
+        Span<int> ao = stackalloc int[4];
+        for (int i = 0; i < 4; i++)
+        {
+            // The three blocks diagonally adjacent to this vertex, one layer
+            // out along the face normal, decide its ambient occlusion.
+            int su = 2 * Component(corners[i], uAxis) - 1;
+            int sv = 2 * Component(corners[i], vAxis) - 1;
+
+            var side1 = Offset((bx + nx, by + ny, bz + nz), uAxis, su);
+            var side2 = Offset((bx + nx, by + ny, bz + nz), vAxis, sv);
+            var corner = Offset(side1, vAxis, sv);
+            bool s1 = BlockInfo.IsSolid(sample(side1.X, side1.Y, side1.Z));
+            bool s2 = BlockInfo.IsSolid(sample(side2.X, side2.Y, side2.Z));
+            bool sc = BlockInfo.IsSolid(sample(corner.X, corner.Y, corner.Z));
+
+            ao[i] = s1 && s2 ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (sc ? 1 : 0));
+
+            byte brightness = (byte)(255 * shade * AoFactor[ao[i]]);
+            vertices.Add(new VertexPositionColorTexture(
+                blockPos + corners[i], new Color(brightness, brightness, brightness), uvs[i]));
+        }
+
+        // Split the quad along the diagonal that connects the less-occluded
+        // pair, otherwise AO gradients show a directional artifact.
+        if (ao[0] + ao[2] >= ao[1] + ao[3])
+        {
+            indices.Add(baseIndex + 0);
+            indices.Add(baseIndex + 1);
+            indices.Add(baseIndex + 2);
+            indices.Add(baseIndex + 0);
+            indices.Add(baseIndex + 2);
+            indices.Add(baseIndex + 3);
+        }
+        else
+        {
+            indices.Add(baseIndex + 1);
+            indices.Add(baseIndex + 2);
+            indices.Add(baseIndex + 3);
+            indices.Add(baseIndex + 1);
+            indices.Add(baseIndex + 3);
+            indices.Add(baseIndex + 0);
+        }
+    }
+
+    private static void AddWaterFace(List<VertexPositionColorTexture> vertices, List<int> indices,
+        int bx, int by, int bz, int face)
+    {
+        byte shade = (byte)(255 * FaceShade[face]);
+        var color = new Color(shade, shade, shade, WaterAlpha);
+        var uv = TextureAtlas.GetUVBounds(BlockInfo.TileWater);
+        var blockPos = new Vector3(bx, by, bz);
+        var corners = FaceCorners[face];
+
+        int baseIndex = vertices.Count;
         vertices.Add(new VertexPositionColorTexture(blockPos + corners[0], color, new Vector2(uv.X, uv.W)));
         vertices.Add(new VertexPositionColorTexture(blockPos + corners[1], color, new Vector2(uv.Z, uv.W)));
         vertices.Add(new VertexPositionColorTexture(blockPos + corners[2], color, new Vector2(uv.Z, uv.Y)));
@@ -104,4 +190,13 @@ public static class ChunkMesher
         indices.Add(baseIndex + 2);
         indices.Add(baseIndex + 3);
     }
+
+    private static int Component(Vector3 v, int axis) => (int)(axis == 0 ? v.X : axis == 1 ? v.Y : v.Z);
+
+    private static (int X, int Y, int Z) Offset((int X, int Y, int Z) p, int axis, int amount) => axis switch
+    {
+        0 => (p.X + amount, p.Y, p.Z),
+        1 => (p.X, p.Y + amount, p.Z),
+        _ => (p.X, p.Y, p.Z + amount),
+    };
 }

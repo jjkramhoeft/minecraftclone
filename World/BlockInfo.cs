@@ -23,8 +23,10 @@ public static class BlockInfo
     public const int TileWoodSide = 5;
     public const int TileWoodTop = 6;
     public const int TileLeaves = 7;
+    public const int TileWater = 8;
 
-    public static bool IsSolid(BlockType type) => type != BlockType.Air;
+    /// <summary>Solid blocks collide, block raycasts, and hide neighboring faces.</summary>
+    public static bool IsSolid(BlockType type) => type is not (BlockType.Air or BlockType.Water);
 
     public static int GetFaceTile(BlockType type, BlockFace face) => type switch
     {
@@ -39,6 +41,7 @@ public static class BlockInfo
         BlockType.Sand => TileSand,
         BlockType.Wood => face is BlockFace.Top or BlockFace.Bottom ? TileWoodTop : TileWoodSide,
         BlockType.Leaves => TileLeaves,
+        BlockType.Water => TileWater,
         _ => TileDirt,
     };
 }

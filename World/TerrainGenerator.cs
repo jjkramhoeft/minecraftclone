@@ -14,6 +14,7 @@ public class TerrainGenerator
     private const float Amplitude = 16f;
     private const int DirtDepth = 3;
     private const int SandLevel = 38;       // surfaces at or below this are sandy
+    private const int WaterLevel = 37;      // valleys below this fill with water
     private const int TreeSpacing = 61;     // 1 tree per ~61 eligible columns
 
     private readonly FastNoiseLite _heightNoise;
@@ -55,6 +56,10 @@ public class TerrainGenerator
                         BlockType.Dirt;
                     chunk.SetBlock(x, y, z, type);
                 }
+
+                // Still water fills the valleys (no flow simulation).
+                for (int y = height + 1; y <= WaterLevel; y++)
+                    chunk.SetBlock(x, y, z, BlockType.Water);
             }
         }
 
