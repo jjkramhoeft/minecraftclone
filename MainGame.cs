@@ -84,7 +84,7 @@ public class MainGame : Game
     protected override void Update(GameTime gameTime)
     {
         var keyboard = Keyboard.GetState();
-        if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || keyboard.IsKeyDown(Keys.Escape))
+        if (keyboard.IsKeyDown(Keys.Escape))
             Exit();
 
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
