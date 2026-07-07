@@ -145,11 +145,15 @@ public class BlockInteraction
             || !_world.IsChunkLoaded(ChunkManager.ToChunkCoord(new Vector3(x, 0, z))))
             return;
 
-        // Flowers only grow on grass or dirt.
-        if (BlockInfo.IsFlower(blockToPlace))
+        // Plants need valid ground: flowers grow on grass/dirt; reeds on
+        // sand/dirt/grass with water beside the supporting block (or stacked
+        // on another reed).
+        if (BlockInfo.IsPlant(blockToPlace))
         {
             var below = _world.GetBlock(x, y - 1, z);
-            if (below != BlockType.Grass && below != BlockType.Dirt)
+            if (!BlockInfo.CanSupportPlant(blockToPlace, below))
+                return;
+            if (blockToPlace == BlockType.Reeds && below != BlockType.Reeds && !HasAdjacentWater(x, y - 1, z))
                 return;
         }
 
@@ -158,6 +162,12 @@ public class BlockInteraction
         _inventory.ConsumeFromSlot(_inventory.SelectedIndex);
         ActionPerformed?.Invoke();
     }
+
+    private bool HasAdjacentWater(int x, int y, int z) =>
+        _world.GetBlock(x + 1, y, z) == BlockType.Water
+        || _world.GetBlock(x - 1, y, z) == BlockType.Water
+        || _world.GetBlock(x, y, z + 1) == BlockType.Water
+        || _world.GetBlock(x, y, z - 1) == BlockType.Water;
 
     private bool IntersectsPlayer(int x, int y, int z)
     {

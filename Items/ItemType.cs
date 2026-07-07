@@ -21,6 +21,7 @@ public enum ItemType : ushort
     FlowerRed = 10,
     FlowerYellow = 11,
     FlowerPoppy = 12,
+    Reeds = 13,
 
     Stick = 32,
     WoodenPickaxe = 33,

@@ -87,9 +87,9 @@ public static class ChunkMesher
                     if (type == BlockType.Air)
                         continue;
 
-                    if (BlockInfo.IsFlower(type))
+                    if (BlockInfo.IsPlant(type))
                     {
-                        // Flowers are crossed quads in the cutout pass — no
+                        // Plants are crossed quads in the cutout pass — no
                         // faces, no culling, no AO, no neighbor reads.
                         AddCrossQuads(cutoutVertices, cutoutIndices, x, y, z, type);
                         continue;

@@ -55,18 +55,30 @@ public static class BlockInfo
     public const int TileShirt = 26;
     public const int TilePants = 27;
     public const int TileFace = 28;
+    public const int TileReeds = 29;
 
     /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
-    /// occlusion. Flowers are deliberately NOT solid — you walk through them.</summary>
+    /// occlusion. Plants are deliberately NOT solid — you walk through them.</summary>
     public static bool IsSolid(BlockType type) =>
-        type is not (BlockType.Air or BlockType.Water) && !IsFlower(type);
+        type is not (BlockType.Air or BlockType.Water) && !IsPlant(type);
 
     public static bool IsFlower(BlockType type) =>
         type is >= BlockType.FlowerRed and <= BlockType.FlowerPoppy;
 
-    /// <summary>What the crosshair raycast can hit: solid blocks and flowers,
+    /// <summary>Plants render as crossed quads in the cutout pass, break
+    /// instantly, and need a supporting block below.</summary>
+    public static bool IsPlant(BlockType type) => IsFlower(type) || type == BlockType.Reeds;
+
+    /// <summary>What a plant may stand on. Reeds also stack on themselves.</summary>
+    public static bool CanSupportPlant(BlockType plant, BlockType below) => plant switch
+    {
+        BlockType.Reeds => below is BlockType.Sand or BlockType.Dirt or BlockType.Grass or BlockType.Reeds,
+        _ => below is BlockType.Grass or BlockType.Dirt,
+    };
+
+    /// <summary>What the crosshair raycast can hit: solid blocks and plants,
     /// but never water or air.</summary>
-    public static bool IsTargetable(BlockType type) => IsSolid(type) || IsFlower(type);
+    public static bool IsTargetable(BlockType type) => IsSolid(type) || IsPlant(type);
 
     public static int GetFaceTile(BlockType type, BlockFace face) => type switch
     {
@@ -87,6 +99,7 @@ public static class BlockInfo
         BlockType.FlowerRed => TileFlowerRed,
         BlockType.FlowerYellow => TileFlowerYellow,
         BlockType.FlowerPoppy => TileFlowerPoppy,
+        BlockType.Reeds => TileReeds,
         _ => TileDirt,
     };
 
@@ -99,7 +112,7 @@ public static class BlockInfo
         BlockType.Wood => 2f,
         BlockType.Planks => 1.5f,
         BlockType.Stone or BlockType.Bricks => 4f,
-        _ when IsFlower(type) => 0f, // instant break
+        _ when IsPlant(type) => 0f, // instant break
         _ => 1f,
     };
 

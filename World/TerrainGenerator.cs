@@ -17,6 +17,7 @@ public class TerrainGenerator
     private const int WaterLevel = 37;      // valleys below this fill with water
     private const int TreeSpacing = 61;     // 1 tree per ~61 eligible columns
     private const int FlowerSpacing = 17;   // 1 flower per ~17 grass columns
+    private const int ReedChance = 3;       // reeds on ~1/3 of eligible shoreline columns
 
     private readonly FastNoiseLite _heightNoise;
 
@@ -66,6 +67,47 @@ public class TerrainGenerator
 
         PlantTrees(chunk, heights);
         ScatterFlowers(chunk, heights);
+        GrowReeds(chunk, heights);
+    }
+
+    /// <summary>
+    /// Reed beds along shorelines: 2-3 tall stacks on sand/dirt/grass columns
+    /// that have water directly beside the supporting block. Water adjacency
+    /// is only checkable inside the chunk, so border columns stay bare —
+    /// invisible in practice since shorelines meander.
+    /// </summary>
+    private void GrowReeds(Chunk chunk, ReadOnlySpan<int> heights)
+    {
+        for (int x = 1; x < Chunk.SizeX - 1; x++)
+        {
+            for (int z = 1; z < Chunk.SizeZ - 1; z++)
+            {
+                int worldX = chunk.Coord.X * Chunk.SizeX + x;
+                int worldZ = chunk.Coord.Z * Chunk.SizeZ + z;
+                int hash = Hash(worldX, worldZ, Seed ^ 0x2E8BA2F1);
+                if (hash % ReedChance != 0)
+                    continue;
+
+                int surface = heights[x + z * Chunk.SizeX];
+                var ground = chunk.GetBlock(x, surface, z);
+                if (ground is not (BlockType.Sand or BlockType.Dirt or BlockType.Grass))
+                    continue;
+                if (surface + 1 >= Chunk.SizeY || chunk.GetBlock(x, surface + 1, z) != BlockType.Air)
+                    continue;
+
+                bool waterBeside =
+                    chunk.GetBlock(x + 1, surface, z) == BlockType.Water
+                    || chunk.GetBlock(x - 1, surface, z) == BlockType.Water
+                    || chunk.GetBlock(x, surface, z + 1) == BlockType.Water
+                    || chunk.GetBlock(x, surface, z - 1) == BlockType.Water;
+                if (!waterBeside)
+                    continue;
+
+                int stalkHeight = 2 + hash / ReedChance % 2; // 2-3
+                for (int dy = 1; dy <= stalkHeight && surface + dy < Chunk.SizeY; dy++)
+                    chunk.SetBlock(x, surface + dy, z, BlockType.Reeds);
+            }
+        }
     }
 
     /// <summary>Flowers on grass wherever the salted column hash says so —

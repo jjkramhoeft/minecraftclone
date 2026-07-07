@@ -49,6 +49,7 @@ public class TextureAtlas
         DrawFlower(pixels, BlockInfo.TileFlowerRed, new Color(214, 48, 44));
         DrawFlower(pixels, BlockInfo.TileFlowerYellow, new Color(238, 210, 60));
         DrawFlower(pixels, BlockInfo.TileFlowerPoppy, new Color(238, 238, 230));
+        DrawReeds(pixels);
         DrawSpeckled(pixels, BlockInfo.TileSkin, new Color(224, 180, 145), 5);
         DrawSpeckled(pixels, BlockInfo.TileShirt, new Color(66, 150, 178), 7);
         DrawSpeckled(pixels, BlockInfo.TilePants, new Color(58, 68, 118), 6);
@@ -230,6 +231,33 @@ public class TextureAtlas
                         if (!((x == 10 || x == 14) && (y == 0 || y == 4)))
                             SetPixel(pixels, tile, x, y, head);
                 break;
+        }
+    }
+
+    /// <summary>Shore reeds: a few full-height stalks with leaf nubs, on a
+    /// transparent background (binary alpha for the cutout pass).</summary>
+    private static void DrawReeds(Color[] pixels)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, BlockInfo.TileReeds, x, y, Color.Transparent);
+
+        var rng = RngFor(BlockInfo.TileReeds);
+        var stalk = new Color(132, 168, 78);
+        var tip = new Color(96, 132, 58);
+
+        Span<int> stalkColumns = stackalloc int[] { 3, 7, 11, 14 };
+        foreach (int column in stalkColumns)
+        {
+            int x = column;
+            for (int y = TileSize - 1; y >= 0; y--)
+            {
+                SetPixel(pixels, BlockInfo.TileReeds, x, y, Jitter(rng, y < 5 ? tip : stalk, 8));
+                if (y % 5 == 0 && rng.Next(2) == 0)
+                    x = Math.Clamp(x + rng.Next(-1, 2), 0, TileSize - 1); // gentle kink
+                if (y is 6 or 10 && rng.Next(2) == 0)
+                    SetPixel(pixels, BlockInfo.TileReeds, Math.Clamp(x + 1, 0, TileSize - 1), y, Jitter(rng, stalk, 8)); // leaf nub
+            }
         }
     }
 

@@ -61,6 +61,20 @@ public class BlockUpdater
                 continue; // dropped silently; re-disturbed whenever someone edits nearby again
 
             var block = world.GetBlock(x, y, z);
+
+            // Plants pop (without a drop) when their supporting block is gone,
+            // so digging out the ground never leaves them floating. Reed
+            // stacks cascade via the re-disturbed cell above.
+            if (BlockInfo.IsPlant(block))
+            {
+                if (!BlockInfo.CanSupportPlant(block, world.GetBlock(x, y - 1, z)))
+                {
+                    world.SetBlock(x, y, z, BlockType.Air);
+                    _pending.Add((x, y + 1, z));
+                }
+                continue;
+            }
+
             if (!BlockInfo.HasGravity(block) || BlockInfo.IsSolid(world.GetBlock(x, y - 1, z)))
                 continue;
 

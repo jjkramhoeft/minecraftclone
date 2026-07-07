@@ -15,7 +15,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Crafting**: a recipe list in the inventory screen — wood into planks and sticks, sand into bricks, and wooden/stone tools
 - **Timed mining**: blocks have hardness, tools have speed; stone needs a pickaxe to drop, and a crack overlay shows breaking progress
 - **Falling sand**: gravity blocks drop cell-by-cell when their support is removed, cascading whole columns
-- **Flowers**: three decorative variants scattered on grass, breakable/plantable (on grass or dirt), drawn as cross-quads in an alpha-test pass
+- **Flowers & reeds**: three flower variants scattered on grass, and reed beds (2–3 tall) along shorelines on sand or earth next to water — all drawn as cross-quads in an alpha-test pass; plants pop when their supporting block is removed
 - **A visible player character**: an animated blocky figure — you see its arm swing in first person and the whole walking body in third person
 - **Dual camera**: first-person or over-the-shoulder third person (`V`), with the camera boom pulling in so terrain never occludes the view
 - **Pixel-style textures** from a procedurally generated texture atlas
@@ -75,7 +75,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `ChunkCoord.cs` | A chunk's position in the 2D chunk grid |
 | `ChunkManager.cs` | The heart of the world: streams chunks in and out around the player, schedules background generation/meshing, and exposes `GetBlock`/`SetBlock` in world coordinates — the single block API used by rendering, physics, and raycasting |
 | `TerrainGenerator.cs` | Fills chunks deterministically from the seed: fBm-noise heightmap, stone/dirt/grass strata, sandy lowlands, water-filled valleys, and hash-placed trees |
-| `BlockUpdater.cs` | Tick-based falling for gravity blocks (sand), triggered by player edits and its own moves |
+| `BlockUpdater.cs` | Tick-based block updates: falling sand, and plants popping when unsupported |
 | `FastNoiseLite.cs` | Vendored single-file noise library (MIT) |
 
 ### `Rendering\` — from blocks to pixels

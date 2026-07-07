@@ -15,4 +15,5 @@ public enum BlockType : byte
     FlowerRed,
     FlowerYellow,
     FlowerPoppy,
+    Reeds,
 }
