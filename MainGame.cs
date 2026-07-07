@@ -2,17 +2,20 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using MinecraftClone.Rendering;
+using MinecraftClone.World;
 
 namespace MinecraftClone;
 
 public class MainGame : Game
 {
-    private const float FlySpeed = 10f;
+    private const float FlySpeed = 12f;
+    private const int WorldSeed = 12345;
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
     private FirstPersonCamera _camera;
-    private DebugCube _debugCube;
+    private WorldRenderer _worldRenderer;
+    private ChunkMesh _chunkMesh;
 
     // False whenever the window lost focus, so the first recentering of the
     // mouse doesn't register as a huge look delta.
@@ -32,9 +35,9 @@ public class MainGame : Game
     {
         _camera = new FirstPersonCamera
         {
-            Position = new Vector3(0f, 1.5f, -5f),
-            Yaw = 0f,          // looking toward +Z, at the cube
-            Pitch = -0.28f,    // tilted slightly down toward the origin
+            Position = new Vector3(8f, 68f, -14f), // above and south of the chunk, looking in
+            Yaw = 0f,
+            Pitch = -0.5f,
         };
         _camera.UpdateProjection(GraphicsDevice.Viewport.AspectRatio);
 
@@ -44,7 +47,14 @@ public class MainGame : Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _debugCube = new DebugCube(GraphicsDevice);
+        _worldRenderer = new WorldRenderer(GraphicsDevice);
+
+        // Phase 2: a single chunk at the origin. Phase 3 moves this into ChunkManager.
+        var generator = new TerrainGenerator(WorldSeed);
+        var chunk = new Chunk(new ChunkCoord(0, 0));
+        generator.Generate(chunk);
+        var meshData = ChunkMesher.Build(chunk, (x, y, z) => BlockType.Air);
+        _chunkMesh = new ChunkMesh(GraphicsDevice, chunk.Coord, meshData);
     }
 
     protected override void Update(GameTime gameTime)
@@ -96,9 +106,8 @@ public class MainGame : Game
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(Color.CornflowerBlue);
-        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
 
-        _debugCube.Draw(GraphicsDevice, _camera.View, _camera.Projection);
+        _worldRenderer.Draw(GraphicsDevice, _camera, new[] { _chunkMesh });
 
         base.Draw(gameTime);
     }
