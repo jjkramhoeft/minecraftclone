@@ -131,4 +131,23 @@ public class WorldSave
     {
         File.WriteAllText(MetadataPath, JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
     }
+
+    /// <summary>Erases the world from disk (all chunk files + metadata) — used
+    /// when restarting with a new seed. The directories stay in place.</summary>
+    public void DeleteAll()
+    {
+        try
+        {
+            if (Directory.Exists(_chunksDir))
+                foreach (var file in Directory.GetFiles(_chunksDir))
+                    File.Delete(file);
+            if (File.Exists(MetadataPath))
+                File.Delete(MetadataPath);
+        }
+        catch (Exception)
+        {
+            // Best effort: a stray locked file only means stale chunks linger
+            // until they're overwritten.
+        }
+    }
 }

@@ -104,6 +104,12 @@ public class Inventory
         return true;
     }
 
+    public void Clear()
+    {
+        Array.Clear(_slots);
+        SelectedIndex = 0;
+    }
+
     /// <summary>Copy of all slots, for all-or-nothing operations (crafting rollback).</summary>
     public ItemStack[] SnapshotSlots() => (ItemStack[])_slots.Clone();
 

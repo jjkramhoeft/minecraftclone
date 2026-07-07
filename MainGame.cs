@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -119,6 +120,9 @@ public class MainGame : Game
         if (keyboard.IsKeyDown(Keys.V) && _previousKeyboard.IsKeyUp(Keys.V))
             _camera.ThirdPerson = !_camera.ThirdPerson;
 
+        if (!_inventoryScreen.IsOpen && keyboard.IsKeyDown(Keys.N) && _previousKeyboard.IsKeyUp(Keys.N))
+            RestartWorld();
+
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         if (_inventoryScreen.IsOpen)
         {
@@ -143,6 +147,30 @@ public class MainGame : Game
         _previousMouse = mouse;
 
         base.Update(gameTime);
+    }
+
+    /// <summary>Abandons the current world (deleting its save) and starts a
+    /// fresh one with a random seed: new terrain, empty inventory, respawn.</summary>
+    private void RestartWorld()
+    {
+        _seed = Random.Shared.Next();
+        _worldSave.DeleteAll();
+
+        // Everything that referenced the old world is rebuilt; the old chunk
+        // manager's in-flight workers finish into discarded queues.
+        _chunkManager.Dispose();
+        _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
+        _blockUpdater = new BlockUpdater();
+        _player = new PlayerController(new Vector3(8.5f, 70f, 8.5f));
+        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
+        _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
+
+        // Hotbar and InventoryScreen hold the inventory reference — clear in place.
+        _inventory.Clear();
+        _camera.Yaw = 0f;
+        _camera.Pitch = 0f;
+
+        SaveWorld(); // pin the new seed to disk immediately
     }
 
     private Vector3 ComputeCameraPosition()

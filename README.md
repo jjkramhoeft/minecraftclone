@@ -41,6 +41,7 @@ Mouse and keyboard only.
 | `V` | Toggle first/third-person camera |
 | `F` | Toggle fly mode |
 | `F5` | Save world |
+| `N` | Restart with a new random seed (⚠ deletes the current world and inventory) |
 | `Esc` | Quit |
 
 ## Build & run
@@ -144,7 +145,7 @@ Saves live in `saves\default\` relative to the working directory (next to the ex
 - `world.json` — seed, format version, player position/rotation, selected hotbar slot, fly mode
 - `chunks\c_{x}_{z}.bin` — one file per *modified* chunk: small header (magic, version, chunk coordinate) followed by the raw 32 KB block array behind a `GZipStream` (~1-3 KB on disk)
 
-Saving happens automatically when chunks unload and when the game exits; `F5` forces a full save. Delete the `saves` folder for a fresh world.
+Saving happens automatically when chunks unload and when the game exits; `F5` forces a full save. Press `N` in-game (or delete the `saves` folder) for a fresh world with a new random seed — this erases the current world and inventory.
 
 ## Non-goals
 
