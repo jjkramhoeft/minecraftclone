@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using MinecraftClone.Player;
 using MinecraftClone.Rendering;
 using MinecraftClone.World;
 
@@ -8,7 +9,6 @@ namespace MinecraftClone;
 
 public class MainGame : Game
 {
-    private const float FlySpeed = 12f;
     private const int WorldSeed = 12345;
 
     private GraphicsDeviceManager _graphics;
@@ -16,6 +16,7 @@ public class MainGame : Game
     private FirstPersonCamera _camera;
     private WorldRenderer _worldRenderer;
     private ChunkManager _chunkManager;
+    private PlayerController _player;
 
     private double _titleTimer;
     private int _frames;
@@ -36,13 +37,12 @@ public class MainGame : Game
 
     protected override void Initialize()
     {
-        _camera = new FirstPersonCamera
-        {
-            Position = new Vector3(8f, 75f, 8f), // above the terrain at the origin
-            Yaw = 0f,
-            Pitch = -0.35f,
-        };
+        _camera = new FirstPersonCamera { Yaw = 0f, Pitch = 0f };
         _camera.UpdateProjection(GraphicsDevice.Viewport.AspectRatio);
+
+        // Spawn above the highest possible terrain; the player falls to the
+        // ground once the spawn chunk has loaded.
+        _player = new PlayerController(new Vector3(8.5f, 70f, 8.5f));
 
         base.Initialize();
     }
@@ -62,8 +62,9 @@ public class MainGame : Game
 
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         UpdateMouseLook();
-        UpdateFlyMovement(keyboard, dt);
-        _chunkManager.Update(_camera.Position);
+        _player.Update(keyboard, _camera, _chunkManager, dt);
+        _camera.Position = _player.EyePosition;
+        _chunkManager.Update(_player.Position);
 
         base.Update(gameTime);
     }
@@ -87,20 +88,6 @@ public class MainGame : Game
         _mouseCaptured = true;
     }
 
-    private void UpdateFlyMovement(KeyboardState keyboard, float dt)
-    {
-        var move = Vector3.Zero;
-        if (keyboard.IsKeyDown(Keys.W)) move += _camera.HorizontalForward;
-        if (keyboard.IsKeyDown(Keys.S)) move -= _camera.HorizontalForward;
-        if (keyboard.IsKeyDown(Keys.D)) move += _camera.Right;
-        if (keyboard.IsKeyDown(Keys.A)) move -= _camera.Right;
-        if (move != Vector3.Zero) move.Normalize();
-        if (keyboard.IsKeyDown(Keys.Space)) move += Vector3.Up;
-        if (keyboard.IsKeyDown(Keys.LeftShift)) move -= Vector3.Up;
-
-        _camera.Position += move * FlySpeed * dt;
-    }
-
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(Color.CornflowerBlue);
@@ -118,8 +105,9 @@ public class MainGame : Game
         if (_titleTimer < 1.0)
             return;
 
-        var pos = _camera.Position;
-        Window.Title = $"Minecraft Clone — {_frames} fps | {_chunkManager.LoadedChunkCount} chunks ({_chunkManager.PendingCount} pending) | {pos.X:0.#}, {pos.Y:0.#}, {pos.Z:0.#}";
+        var pos = _player.Position;
+        string mode = _player.IsFlying ? "fly" : _player.IsOnGround ? "walk" : "air";
+        Window.Title = $"Minecraft Clone — {_frames} fps | {_chunkManager.LoadedChunkCount} chunks ({_chunkManager.PendingCount} pending) | {pos.X:0.#}, {pos.Y:0.#}, {pos.Z:0.#} [{mode}]";
         _frames = 0;
         _titleTimer = 0;
     }

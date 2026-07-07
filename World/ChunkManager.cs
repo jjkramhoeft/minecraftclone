@@ -61,6 +61,8 @@ public class ChunkManager : IDisposable
     public static ChunkCoord ToChunkCoord(Vector3 position) =>
         new((int)MathF.Floor(position.X) >> 4, (int)MathF.Floor(position.Z) >> 4);
 
+    public bool IsChunkLoaded(ChunkCoord coord) => _chunks.ContainsKey(coord);
+
     public BlockType GetBlock(int x, int y, int z)
     {
         if (y < 0 || y >= Chunk.SizeY)
