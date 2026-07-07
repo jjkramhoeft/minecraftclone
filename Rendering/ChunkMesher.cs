@@ -7,7 +7,7 @@ using MinecraftClone.World;
 namespace MinecraftClone.Rendering;
 
 /// <summary>CPU-side mesh: safe to build on a worker thread, uploaded to the GPU by ChunkMesh.</summary>
-public record MeshData(VertexPositionColor[] Vertices, int[] Indices)
+public record MeshData(VertexPositionColorTexture[] Vertices, int[] Indices)
 {
     public bool IsEmpty => Indices.Length == 0;
 }
@@ -47,7 +47,7 @@ public static class ChunkMesher
     /// </param>
     public static MeshData Build(Chunk chunk, Func<int, int, int, BlockType> getOutsideBlock)
     {
-        var vertices = new List<VertexPositionColor>();
+        var vertices = new List<VertexPositionColorTexture>();
         var indices = new List<int>();
 
         for (int y = 0; y < Chunk.SizeY; y++)
@@ -79,16 +79,23 @@ public static class ChunkMesher
         return new MeshData(vertices.ToArray(), indices.ToArray());
     }
 
-    private static void AddFace(List<VertexPositionColor> vertices, List<int> indices, Vector3 blockPos, int face, BlockType type)
+    private static void AddFace(List<VertexPositionColorTexture> vertices, List<int> indices, Vector3 blockPos, int face, BlockType type)
     {
-        var baseColor = BlockInfo.GetFaceColor(type, (BlockFace)face);
-        float shade = FaceShade[face];
-        var color = new Color((byte)(baseColor.R * shade), (byte)(baseColor.G * shade), (byte)(baseColor.B * shade));
+        // The face brightness rides in the vertex color; BasicEffect multiplies
+        // it with the sampled atlas texel.
+        byte shade = (byte)(255 * FaceShade[face]);
+        var color = new Color(shade, shade, shade);
 
+        var uv = TextureAtlas.GetUVBounds(BlockInfo.GetFaceTile(type, (BlockFace)face));
+
+        // FaceCorners order is (bottom-left, bottom-right, top-right, top-left)
+        // for the side faces, so v runs top-of-tile → top-of-block.
         int baseIndex = vertices.Count;
         var corners = FaceCorners[face];
-        for (int i = 0; i < 4; i++)
-            vertices.Add(new VertexPositionColor(blockPos + corners[i], color));
+        vertices.Add(new VertexPositionColorTexture(blockPos + corners[0], color, new Vector2(uv.X, uv.W)));
+        vertices.Add(new VertexPositionColorTexture(blockPos + corners[1], color, new Vector2(uv.Z, uv.W)));
+        vertices.Add(new VertexPositionColorTexture(blockPos + corners[2], color, new Vector2(uv.Z, uv.Y)));
+        vertices.Add(new VertexPositionColorTexture(blockPos + corners[3], color, new Vector2(uv.X, uv.Y)));
 
         indices.Add(baseIndex + 0);
         indices.Add(baseIndex + 1);

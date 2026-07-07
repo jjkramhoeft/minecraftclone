@@ -8,12 +8,14 @@ public class WorldRenderer
 {
     private readonly BasicEffect _effect;
 
-    public WorldRenderer(GraphicsDevice device)
+    public WorldRenderer(GraphicsDevice device, TextureAtlas atlas)
     {
         _effect = new BasicEffect(device)
         {
             VertexColorEnabled = true,
             LightingEnabled = false,
+            TextureEnabled = true,
+            Texture = atlas.Texture,
         };
     }
 
@@ -22,6 +24,7 @@ public class WorldRenderer
         device.DepthStencilState = DepthStencilState.Default;
         device.BlendState = BlendState.Opaque;
         device.RasterizerState = RasterizerState.CullCounterClockwise;
+        device.SamplerStates[0] = SamplerState.PointClamp; // crisp pixels, no atlas bleed
 
         _effect.View = camera.View;
         _effect.Projection = camera.Projection;

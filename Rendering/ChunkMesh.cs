@@ -25,7 +25,7 @@ public class ChunkMesh : IDisposable
         if (data.IsEmpty)
             return;
 
-        _vertexBuffer = new VertexBuffer(device, VertexPositionColor.VertexDeclaration, data.Vertices.Length, BufferUsage.WriteOnly);
+        _vertexBuffer = new VertexBuffer(device, VertexPositionColorTexture.VertexDeclaration, data.Vertices.Length, BufferUsage.WriteOnly);
         _vertexBuffer.SetData(data.Vertices);
         _indexBuffer = new IndexBuffer(device, IndexElementSize.ThirtyTwoBits, data.Indices.Length, BufferUsage.WriteOnly);
         _indexBuffer.SetData(data.Indices);

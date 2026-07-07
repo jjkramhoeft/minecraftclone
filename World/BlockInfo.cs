@@ -1,5 +1,3 @@
-using Microsoft.Xna.Framework;
-
 namespace MinecraftClone.World;
 
 /// <summary>Face order matches ChunkMesher's face tables.</summary>
@@ -15,22 +13,32 @@ public enum BlockFace
 
 public static class BlockInfo
 {
+    // Atlas tile indices — TextureAtlas generates these tiles, the mesher and
+    // hotbar look them up through GetFaceTile.
+    public const int TileGrassTop = 0;
+    public const int TileGrassSide = 1;
+    public const int TileDirt = 2;
+    public const int TileStone = 3;
+    public const int TileSand = 4;
+    public const int TileWoodSide = 5;
+    public const int TileWoodTop = 6;
+    public const int TileLeaves = 7;
+
     public static bool IsSolid(BlockType type) => type != BlockType.Air;
 
-    // Phase 2: flat per-face colors. Phase 6 replaces these with texture atlas tiles.
-    public static Color GetFaceColor(BlockType type, BlockFace face) => type switch
+    public static int GetFaceTile(BlockType type, BlockFace face) => type switch
     {
         BlockType.Grass => face switch
         {
-            BlockFace.Top => new Color(96, 176, 64),
-            BlockFace.Bottom => new Color(134, 96, 67),
-            _ => new Color(115, 134, 62),
+            BlockFace.Top => TileGrassTop,
+            BlockFace.Bottom => TileDirt,
+            _ => TileGrassSide,
         },
-        BlockType.Dirt => new Color(134, 96, 67),
-        BlockType.Stone => new Color(125, 125, 125),
-        BlockType.Sand => new Color(219, 207, 163),
-        BlockType.Wood => new Color(102, 81, 50),
-        BlockType.Leaves => new Color(58, 138, 42),
-        _ => Color.Magenta,
+        BlockType.Dirt => TileDirt,
+        BlockType.Stone => TileStone,
+        BlockType.Sand => TileSand,
+        BlockType.Wood => face is BlockFace.Top or BlockFace.Bottom ? TileWoodTop : TileWoodSide,
+        BlockType.Leaves => TileLeaves,
+        _ => TileDirt,
     };
 }

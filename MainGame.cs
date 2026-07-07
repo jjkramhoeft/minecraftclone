@@ -21,6 +21,8 @@ public class MainGame : Game
     private PlayerController _player;
     private BlockHighlight _blockHighlight;
     private Hud _hud;
+    private TextureAtlas _atlas;
+    private Hotbar _hotbar;
 
     private MouseState _previousMouse;
     private RaycastHit? _targetedBlock;
@@ -57,10 +59,12 @@ public class MainGame : Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _worldRenderer = new WorldRenderer(GraphicsDevice);
+        _atlas = new TextureAtlas(GraphicsDevice);
+        _worldRenderer = new WorldRenderer(GraphicsDevice, _atlas);
         _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(WorldSeed));
         _blockHighlight = new BlockHighlight(GraphicsDevice);
         _hud = new Hud(GraphicsDevice);
+        _hotbar = new Hotbar(GraphicsDevice);
     }
 
     protected override void Update(GameTime gameTime)
@@ -82,6 +86,9 @@ public class MainGame : Game
     private void UpdateBlockInteraction()
     {
         var mouse = Mouse.GetState();
+        if (IsActive)
+            _hotbar.Update(Keyboard.GetState(), mouse);
+
         _targetedBlock = VoxelRaycaster.Cast(_chunkManager, _camera.Position, _camera.Forward, Reach, out var hit)
             ? hit
             : null;
@@ -101,7 +108,7 @@ public class MainGame : Game
                 int y = target.Y + target.NormalY;
                 int z = target.Z + target.NormalZ;
                 if (_chunkManager.GetBlock(x, y, z) == BlockType.Air && !IntersectsPlayer(x, y, z))
-                    _chunkManager.SetBlock(x, y, z, BlockType.Dirt); // Phase 6 replaces with the hotbar selection
+                    _chunkManager.SetBlock(x, y, z, _hotbar.SelectedBlock);
             }
         }
 
@@ -143,6 +150,7 @@ public class MainGame : Game
         if (_targetedBlock is { } target)
             _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
         _hud.Draw(_spriteBatch, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+        _hotbar.Draw(_spriteBatch, _atlas, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
 
         UpdateDebugTitle(gameTime);
         base.Draw(gameTime);
