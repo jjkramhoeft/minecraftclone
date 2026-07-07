@@ -22,6 +22,8 @@ public class MainGame : Game
     private WorldRenderer _worldRenderer;
     private ChunkManager _chunkManager;
     private BlockUpdater _blockUpdater;
+    private FallingBlocks _fallingBlocks;
+    private FallingBlockRenderer _fallingBlockRenderer;
     private PlayerController _player;
     private BlockInteraction _blockInteraction;
     private BlockHighlight _blockHighlight;
@@ -92,6 +94,8 @@ public class MainGame : Game
         _blockHighlight = new BlockHighlight(GraphicsDevice);
         _breakingOverlay = new BreakingOverlay(GraphicsDevice, _atlas);
         _blockUpdater = new BlockUpdater();
+        _fallingBlocks = new FallingBlocks();
+        _fallingBlockRenderer = new FallingBlockRenderer(GraphicsDevice, _atlas);
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
         _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
@@ -138,7 +142,8 @@ public class MainGame : Game
             _blockInteraction.Update(_camera, mouse, _previousMouse, IsActive && _mouseCaptured, dt);
         }
         _chunkManager.Update(_player.Position);
-        _blockUpdater.Update(_chunkManager, dt);
+        _blockUpdater.Update(_chunkManager, _fallingBlocks, dt);
+        _fallingBlocks.Update(_chunkManager, _blockUpdater, dt);
         _playerModel.Update(_player, dt, !_inventoryScreen.IsOpen && _blockInteraction.IsMining);
 
         if (keyboard.IsKeyDown(Keys.F5) && _previousKeyboard.IsKeyUp(Keys.F5))
@@ -161,6 +166,7 @@ public class MainGame : Game
         _chunkManager.Dispose();
         _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
         _blockUpdater = new BlockUpdater();
+        _fallingBlocks.Clear();
         _player = new PlayerController(new Vector3(8.5f, 70f, 8.5f));
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
@@ -221,6 +227,8 @@ public class MainGame : Game
 
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
+        // Land anything mid-air so no block is lost between sessions.
+        _fallingBlocks.SettleAll(_chunkManager, _blockUpdater);
         SaveWorld();
         base.OnExiting(sender, args);
     }
@@ -251,6 +259,7 @@ public class MainGame : Game
         int width = GraphicsDevice.Viewport.Width, height = GraphicsDevice.Viewport.Height;
 
         _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
+        _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);
         if (!_inventoryScreen.IsOpen)
         {
             if (_blockInteraction.IsMining)

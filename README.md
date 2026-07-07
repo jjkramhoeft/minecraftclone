@@ -14,7 +14,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Survival-lite inventory**: broken blocks drop items into a 24-slot inventory (`E` to open); placing consumes from the selected hotbar stack
 - **Crafting**: a recipe list in the inventory screen — wood into planks and sticks, sand into bricks, and wooden/stone tools
 - **Timed mining**: blocks have hardness, tools have speed; stone needs a pickaxe to drop, and a crack overlay shows breaking progress
-- **Falling sand**: gravity blocks drop cell-by-cell when their support is removed, cascading whole columns
+- **Falling sand**: gravity blocks detach and fall smoothly (accelerating, like a dropped object) when their support is removed, columns cascading with a slight stagger
 - **Flowers & reeds**: three flower variants scattered on grass, and reed beds (2–3 tall) along shorelines on sand or earth next to water — all drawn as cross-quads in an alpha-test pass; plants pop when their supporting block is removed
 - **A visible player character**: an animated blocky figure — you see its arm swing in first person and the whole walking body in third person
 - **Dual camera**: first-person or over-the-shoulder third person (`V`), with the camera boom pulling in so terrain never occludes the view
@@ -75,7 +75,8 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `ChunkCoord.cs` | A chunk's position in the 2D chunk grid |
 | `ChunkManager.cs` | The heart of the world: streams chunks in and out around the player, schedules background generation/meshing, and exposes `GetBlock`/`SetBlock` in world coordinates — the single block API used by rendering, physics, and raycasting |
 | `TerrainGenerator.cs` | Fills chunks deterministically from the seed: fBm-noise heightmap, stone/dirt/grass strata, sandy lowlands, water-filled valleys, and hash-placed trees |
-| `BlockUpdater.cs` | Tick-based block updates: falling sand, and plants popping when unsupported |
+| `BlockUpdater.cs` | Tick-based block updates: detaches unsupported gravity blocks, pops unsupported plants |
+| `FallingBlocks.cs` | Airborne gravity blocks: smooth accelerated fall, landing back into the grid (settled on exit so none are lost) |
 | `FastNoiseLite.cs` | Vendored single-file noise library (MIT) |
 
 ### `Rendering\` — from blocks to pixels
@@ -90,6 +91,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `WorldRenderer.cs` | Draws all visible chunk meshes: frustum culling, distance fog, an opaque pass, then a blended water pass |
 | `BlockHighlight.cs` | Wireframe outline around the block under the crosshair |
 | `BreakingOverlay.cs` | Crack texture drawn over the block being mined, staged by progress |
+| `FallingBlockRenderer.cs` | Textured cubes for airborne falling blocks at their continuous positions |
 
 ### `Player\` — input, physics, interaction
 

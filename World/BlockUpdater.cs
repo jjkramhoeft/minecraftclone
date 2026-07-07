@@ -3,14 +3,13 @@ using System.Collections.Generic;
 namespace MinecraftClone.World;
 
 /// <summary>
-/// Cell-by-cell falling for gravity blocks (sand). Player edits notify the
-/// updater, which re-checks the disturbed cells and their neighbors on a fixed
-/// tick; a block with a non-solid cell below moves down one cell per tick
-/// (destroying flowers / displacing water — there is no flow simulation) and
-/// re-disturbs the cells above and below it, so columns cascade.
+/// Block updates on a fixed tick over a pending set of disturbed cells: an
+/// unsupported gravity block leaves the grid and becomes a smoothly animated
+/// FallingBlocks entry; an unsupported plant pops. The cell above a change is
+/// re-disturbed, so columns cascade.
 ///
 /// Deliberately not hooked into ChunkManager.SetBlock: worldgen and chunk
-/// loading must never cause update storms. Every move goes through SetBlock,
+/// loading must never cause update storms. Every change goes through SetBlock,
 /// so saving (IsModified) and the stale-mesh guard (Version) work unchanged.
 /// The pending set is not persisted — sand left floating in an unloaded chunk
 /// stays floating until something disturbs it again.
@@ -36,7 +35,7 @@ public class BlockUpdater
         _pending.Add((x, y, z - 1));
     }
 
-    public void Update(ChunkManager world, float dt)
+    public void Update(ChunkManager world, FallingBlocks fallingBlocks, float dt)
     {
         _tickTimer += dt;
         if (_tickTimer < TickInterval || _pending.Count == 0)
@@ -78,9 +77,10 @@ public class BlockUpdater
             if (!BlockInfo.HasGravity(block) || BlockInfo.IsSolid(world.GetBlock(x, y - 1, z)))
                 continue;
 
+            // Leave the grid and fall as a smoothly animated entry; it places
+            // itself back into the world when it lands.
             world.SetBlock(x, y, z, BlockType.Air);
-            world.SetBlock(x, y - 1, z, block);
-            _pending.Add((x, y - 1, z)); // keep falling next tick
+            fallingBlocks.Spawn(block, x, y, z);
             _pending.Add((x, y + 1, z)); // the column above lost its support
         }
     }
