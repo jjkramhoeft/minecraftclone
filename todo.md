@@ -25,3 +25,8 @@ Minecraft itself as the reference.
 - [ ] Better break up decal. Do not use the current ramdom 'splatter' - there should be progression 
       and some build up in the dark pattern.
 - [ ] Better cobblestone texture      
+- [ ] Fix The held-tool position/angle and scale. If it sits wrong in the hand, the numbers to tweak are
+      the local matrix in DrawHeldItem (Rendering/PlayerModel.cs) 
+      — scale 0.55, 
+      — the Z/Y rotations, 
+      — and the translation (0.5, -0.5, -0.9).
