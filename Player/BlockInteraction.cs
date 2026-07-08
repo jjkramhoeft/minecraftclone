@@ -32,6 +32,10 @@ public class BlockInteraction
     /// <summary>Fired on every completed break or successful place (arm swing hook).</summary>
     public event Action ActionPerformed;
 
+    /// <summary>Fired with the broken/placed block type (audio hook).</summary>
+    public event Action<BlockType> BlockBroken;
+    public event Action<BlockType> BlockPlaced;
+
     public float BreakProgress => _progress;
     public (int X, int Y, int Z) MiningPos => _miningPos;
     public bool IsMining => _progress > 0f;
@@ -119,6 +123,7 @@ public class BlockInteraction
         _blockUpdater.NotifyBlockChanged(target.X, target.Y, target.Z);
         _progress = 0f;
         ActionPerformed?.Invoke();
+        BlockBroken?.Invoke(type);
 
         if (dropAllowed)
         {
@@ -162,6 +167,7 @@ public class BlockInteraction
         _blockUpdater.NotifyBlockChanged(x, y, z);
         _inventory.ConsumeFromSlot(_inventory.SelectedIndex);
         ActionPerformed?.Invoke();
+        BlockPlaced?.Invoke(blockToPlace);
     }
 
     private bool HasAdjacentWater(int x, int y, int z) =>

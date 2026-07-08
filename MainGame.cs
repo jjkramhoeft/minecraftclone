@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using MinecraftClone.Audio;
 using MinecraftClone.Items;
 using MinecraftClone.Persistence;
 using MinecraftClone.Player;
@@ -37,6 +38,12 @@ public class MainGame : Game
     private Inventory _inventory;
     private InventoryScreen _inventoryScreen;
     private PixelFont _font;
+    private GameSounds _sounds;
+
+    // Footstep/splash state, driven from player movement each frame.
+    private Vector3 _lastStepPosition;
+    private float _stepDistance;
+    private bool _wasInWater;
 
     private WorldSave _worldSave;
     private int _seed;
@@ -112,7 +119,8 @@ public class MainGame : Game
         _skyRenderer = new SkyRenderer(GraphicsDevice, _atlas);
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
-        _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
+        _sounds = new GameSounds();
+        WireInteractionEvents();
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
@@ -155,6 +163,7 @@ public class MainGame : Game
             if (IsActive)
                 _hotbar.Update(keyboard, mouse);
             _blockInteraction.Update(_camera, mouse, _previousMouse, IsActive && _mouseCaptured, dt);
+            UpdateMovementSounds();
         }
         _chunkManager.Update(_player.Position);
         _blockUpdater.Update(_chunkManager, _fallingBlocks, dt);
@@ -193,7 +202,7 @@ public class MainGame : Game
         _fallingBlocks.Clear();
         _player = new PlayerController(new Vector3(8.5f, 70f, 8.5f));
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
-        _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
+        WireInteractionEvents();
 
         // Hotbar and InventoryScreen hold the inventory reference — clear in place.
         _inventory.Clear();
@@ -202,6 +211,46 @@ public class MainGame : Game
         _dayNight.TimeOfDay = 0.1f;
 
         SaveWorld(); // pin the new seed to disk immediately
+    }
+
+    private void WireInteractionEvents()
+    {
+        _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
+        _blockInteraction.BlockBroken += _sounds.PlayBreak;
+        _blockInteraction.BlockPlaced += _sounds.PlayPlace;
+    }
+
+    /// <summary>Footsteps every couple of blocks walked on solid ground, and a
+    /// splash when the player's feet enter water.</summary>
+    private void UpdateMovementSounds()
+    {
+        const float StepStride = 2.2f;
+
+        var feet = _player.Position;
+        bool inWater = BlockInfo.IsWater(_chunkManager.GetBlock(
+            (int)MathF.Floor(feet.X), (int)MathF.Floor(feet.Y + 0.6f), (int)MathF.Floor(feet.Z)));
+        if (inWater && !_wasInWater)
+            _sounds.PlaySplash();
+        _wasInWater = inWater;
+
+        if (_player.IsOnGround && !_player.IsFlying && !inWater)
+        {
+            var delta = feet - _lastStepPosition;
+            delta.Y = 0f;
+            _stepDistance += delta.Length();
+            if (_stepDistance >= StepStride)
+            {
+                _stepDistance = 0f;
+                var ground = _chunkManager.GetBlock(
+                    (int)MathF.Floor(feet.X), (int)MathF.Floor(feet.Y - 0.5f), (int)MathF.Floor(feet.Z));
+                _sounds.PlayFootstep(ground);
+            }
+        }
+        else
+        {
+            _stepDistance = 0f;
+        }
+        _lastStepPosition = feet;
     }
 
     private Vector3 ComputeCameraPosition()

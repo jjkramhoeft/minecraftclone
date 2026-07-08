@@ -31,7 +31,7 @@ Minecraft itself as the reference.
 
 ## High impact — game feel
 
-- [ ] **Audio.** The game is completely silent — no `SoundEffect` usage anywhere.
+- [x] **Audio.** The game is completely silent — no `SoundEffect` usage anywhere.
       In keeping with the zero-asset ethos (textures are procedural in
       `Rendering/TextureAtlas.cs`), generate sounds procedurally into
       `SoundEffect.FromStream`/`new SoundEffect(buffer,...)`: noise-burst dig/place per
