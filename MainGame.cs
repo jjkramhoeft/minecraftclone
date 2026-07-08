@@ -51,20 +51,30 @@ public class MainGame : Game
     // mouse doesn't register as a huge look delta.
     private bool _mouseCaptured;
 
-    public MainGame()
+    // Smoke mode (--smoke): runs a fixed number of frames against a throwaway
+    // world, prints a machine-readable summary to stdout, and exits without
+    // touching the real save. Lets tooling verify a change without screenshots.
+    private readonly bool _smoke;
+    private const int SmokeUpdateFrames = 180; // ~3 s at the fixed 60 Hz step
+    private int _smokeUpdates;
+    private int _smokeDraws;
+    private double _smokeElapsed;
+
+    public MainGame(bool smoke = false)
     {
+        _smoke = smoke;
         _graphics = new GraphicsDeviceManager(this);
         _graphics.PreferredBackBufferWidth = 1280;
         _graphics.PreferredBackBufferHeight = 720;
         Content.RootDirectory = "Content";
         IsMouseVisible = false;
-        Window.Title = "Minecraft Clone";
+        Window.Title = smoke ? "Minecraft Clone (smoke test)" : "Minecraft Clone";
     }
 
     protected override void Initialize()
     {
-        _worldSave = new WorldSave();
-        var meta = _worldSave.TryLoadMetadata();
+        _worldSave = new WorldSave(_smoke ? "smoke" : "default");
+        var meta = _smoke ? null : _worldSave.TryLoadMetadata();
         _seed = meta?.Seed ?? DefaultSeed;
 
         _inventory = new Inventory { SelectedIndex = meta?.HotbarIndex ?? 0 };
@@ -138,7 +148,8 @@ public class MainGame : Game
         }
         else
         {
-            UpdateMouseLook();
+            if (!_smoke) // don't recenter the real cursor during an unattended run
+                UpdateMouseLook();
             _player.Update(keyboard, _camera, _chunkManager, dt);
             _camera.Position = ComputeCameraPosition();
             if (IsActive)
@@ -155,6 +166,14 @@ public class MainGame : Game
             SaveWorld();
         _previousKeyboard = keyboard;
         _previousMouse = mouse;
+
+        if (_smoke)
+        {
+            _smokeUpdates++;
+            _smokeElapsed += gameTime.ElapsedGameTime.TotalSeconds;
+            if (_smokeUpdates >= SmokeUpdateFrames)
+                Exit();
+        }
 
         base.Update(gameTime);
     }
@@ -234,10 +253,27 @@ public class MainGame : Game
 
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
+        if (_smoke)
+        {
+            PrintSmokeSummary();
+            base.OnExiting(sender, args);
+            return;
+        }
+
         // Land anything mid-air so no block is lost between sessions.
         _fallingBlocks.SettleAll(_chunkManager, _blockUpdater);
         SaveWorld();
         base.OnExiting(sender, args);
+    }
+
+    private void PrintSmokeSummary()
+    {
+        var pos = _player.Position;
+        double fps = _smokeElapsed > 0 ? _smokeDraws / _smokeElapsed : 0;
+        Console.WriteLine(
+            $"SMOKE OK — {_smokeUpdates} updates / {_smokeDraws} draws in {_smokeElapsed:0.0}s ({fps:0} fps) | " +
+            $"{_chunkManager.LoadedChunkCount} chunks loaded ({_chunkManager.PendingCount} pending) | " +
+            $"player at {pos.X:0.#}, {pos.Y:0.#}, {pos.Z:0.#}");
     }
 
     private void UpdateMouseLook()
@@ -293,6 +329,9 @@ public class MainGame : Game
         _hotbar.Draw(_spriteBatch, _atlas, _font, width, height);
         if (_inventoryScreen.IsOpen)
             _inventoryScreen.Draw(_spriteBatch, _atlas, _font, Mouse.GetState(), width, height);
+
+        if (_smoke)
+            _smokeDraws++;
 
         UpdateDebugTitle(gameTime);
         base.Draw(gameTime);

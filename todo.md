@@ -6,22 +6,6 @@ Compared against: [fogleman/Craft](https://github.com/fogleman/Craft) (C, ~10k l
 [Terasology](https://terasology.org/) (Java, survival/rendering showcase), and classic/beta
 Minecraft itself as the reference.
 
-## Where this clone stands
-
-Ahead of fogleman/Craft in simulation depth: flowing water, animated falling blocks,
-crafting + tool tiers, inventory UI, ambient occlusion, third-person player model —
-Craft has none of that. Craft counters with **player-placeable light sources, clouds,
-sqlite persistence, and Python-server multiplayer**. TrueCraft (the closest C# relative)
-targets full beta 1.7.3: **caves, ores, biomes, health, mobs, furnaces, chests,
-multiplayer** — that feature list is effectively the long-term roadmap for a clone like
-this. Luanti/Terasology are engine-scale (modding APIs, infinite height, shadows) and
-mostly useful as inspiration, not as a bar.
-
-The three biggest gaps versus *every* comparison target: **nothing underground**
-(no caves, no ores — stone all the way down), **no light system** (no torches; night is
-a global tint), and **total silence** (no audio at all).
-
----
 
 ## High impact — the world itself
 
@@ -97,16 +81,6 @@ a global tint), and **total silence** (no audio at all).
       pushed out to match.
 - [ ] **Sub-column meshing or empty-section skip.** Chunks are full 16×128×16 meshes;
       splitting into 16³ sections culls better vertically once caves exist.
-
-## Deliberate someday / probably-not
-
-- [ ] **Multiplayer.** Craft and TrueCraft both have it; it's also the single most
-      invasive change (every system touched). Only worth it as a dedicated project
-      phase — the current main-thread-owns-world architecture is single-player-shaped.
-- [ ] **Shaders beyond BasicEffect** (shadows, animated water, colored light) —
-      MonoGame custom effects open this up, but it's polish on top of the lighting
-      rework, not before it.
-- [ ] **Modding/scripting API** (the Luanti path) — a different project goal entirely.
 
 ## Small polish (grab-bag)
 
