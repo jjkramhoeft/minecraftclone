@@ -57,6 +57,8 @@ public static class ItemInfo
         // Birch/pine logs aren't items themselves; chopping them yields plain wood.
         BlockType.BirchLog or BlockType.PineLog => ItemType.Wood,
         BlockType.Fern => ItemType.None,
+        // Cobblestone (placed stone) mines back into a plain stone item.
+        BlockType.Cobblestone => ItemType.Stone,
         BlockType.Air => ItemType.None,
         BlockType.CoalOre => ItemType.Coal,
         BlockType.FurnaceLit => ItemType.Furnace,

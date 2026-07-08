@@ -83,6 +83,7 @@ public class TextureAtlas
         DrawLogTop(pixels, BlockInfo.TilePineTop, new Color(120, 88, 58), new Color(92, 66, 42));
         DrawLeavesTile(pixels, BlockInfo.TilePineLeaves, new Color(40, 96, 48), new Color(24, 66, 32));
         DrawFern(pixels);
+        DrawCobblestone(pixels);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -481,6 +482,35 @@ public class TextureAtlas
                 x += rng.Next(-1, 2);
                 y += rng.Next(-1, 2);
             }
+        }
+    }
+
+    /// <summary>Cobblestone: rounded gray cobbles of varying shade over dark
+    /// mortar, with edge-straddling stones so the tile reads seamless.</summary>
+    private static void DrawCobblestone(Color[] pixels)
+    {
+        int tile = BlockInfo.TileCobblestone;
+        var rng = RngFor(tile);
+        var mortar = new Color(68, 68, 70);
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Jitter(rng, mortar, 5));
+
+        Span<int> cxs = stackalloc int[] { 3, 10, 4, 12, 8, 0, 15 };
+        Span<int> cys = stackalloc int[] { 3, 4, 11, 12, 8, 10, 1 };
+        for (int k = 0; k < cxs.Length; k++)
+        {
+            int r = 3 + rng.Next(2); // 3-4
+            int g = 118 + rng.Next(28);
+            var stone = new Color(g, g, Math.Min(255, g + 3));
+            for (int dy = -r; dy <= r; dy++)
+                for (int dx = -r; dx <= r; dx++)
+                    if (dx * dx + dy * dy <= r * r)
+                    {
+                        int px = cxs[k] + dx, py = cys[k] + dy;
+                        if (px >= 0 && px < TileSize && py >= 0 && py < TileSize)
+                            SetPixel(pixels, tile, px, py, Jitter(rng, stone, 8));
+                    }
         }
     }
 

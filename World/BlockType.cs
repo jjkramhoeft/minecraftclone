@@ -47,4 +47,7 @@ public enum BlockType : byte
     // Ground cover near pines. A plant (cross-quad, breaks instantly), not an
     // item — it drops nothing, so like the tree variants it needs no ItemType.
     Fern = 34,
+    // Placed stone turns to cobblestone and mines back into a stone item, so
+    // cobblestone is never held as an item and needs no ItemType entry.
+    Cobblestone = 35,
 }

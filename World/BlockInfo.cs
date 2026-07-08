@@ -88,6 +88,7 @@ public static class BlockInfo
     public const int TilePineTop = 56;
     public const int TilePineLeaves = 57;
     public const int TileFern = 58;
+    public const int TileCobblestone = 59;
 
     /// <summary>Solid blocks collide and cast ambient occlusion. Plants are
     /// deliberately NOT solid — you walk through them.</summary>
@@ -158,6 +159,7 @@ public static class BlockInfo
         },
         BlockType.Dirt => TileDirt,
         BlockType.Stone => TileStone,
+        BlockType.Cobblestone => TileCobblestone,
         BlockType.Sand => TileSand,
         BlockType.Wood => face is BlockFace.Top or BlockFace.Bottom ? TileWoodTop : TileWoodSide,
         BlockType.BirchLog => face is BlockFace.Top or BlockFace.Bottom ? TileBirchTop : TileBirchBark,
@@ -207,7 +209,8 @@ public static class BlockInfo
         BlockType.Leaves or BlockType.BirchLeaves or BlockType.PineLeaves => 0.3f,
         BlockType.Wood or BlockType.BirchLog or BlockType.PineLog => 2f,
         BlockType.Planks or BlockType.Chest or BlockType.CraftingTable => 1.5f,
-        BlockType.Stone or BlockType.Bricks or BlockType.Furnace or BlockType.FurnaceLit => 4f,
+        BlockType.Stone or BlockType.Cobblestone or BlockType.Bricks
+            or BlockType.Furnace or BlockType.FurnaceLit => 4f,
         BlockType.CoalOre or BlockType.IronOre => 5f,
         BlockType.Glass => 0.4f,
         _ when IsPlant(type) => 0f, // instant break
@@ -216,8 +219,8 @@ public static class BlockInfo
 
     public static ToolClass GetEffectiveTool(BlockType type) => type switch
     {
-        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre or BlockType.IronOre
-            or BlockType.Furnace or BlockType.FurnaceLit => ToolClass.Pickaxe,
+        BlockType.Stone or BlockType.Cobblestone or BlockType.Bricks or BlockType.CoalOre
+            or BlockType.IronOre or BlockType.Furnace or BlockType.FurnaceLit => ToolClass.Pickaxe,
         BlockType.Wood or BlockType.Planks or BlockType.Leaves or BlockType.Chest
             or BlockType.CraftingTable or BlockType.BirchLog or BlockType.PineLog
             or BlockType.BirchLeaves or BlockType.PineLeaves => ToolClass.Axe,
@@ -229,7 +232,7 @@ public static class BlockInfo
     /// Mining below the tier still breaks the block (slowly) but yields nothing.</summary>
     public static int GetRequiredTier(BlockType type) => type switch
     {
-        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre
+        BlockType.Stone or BlockType.Cobblestone or BlockType.Bricks or BlockType.CoalOre
             or BlockType.Furnace or BlockType.FurnaceLit => 1,
         BlockType.IronOre => 2,
         _ => 0,

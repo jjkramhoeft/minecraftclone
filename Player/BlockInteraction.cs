@@ -236,6 +236,11 @@ public class BlockInteraction
         if (stack.IsEmpty || !ItemInfo.TryGetBlock(stack.Item, out var blockToPlace))
             return;
 
+        // Placed stone sets as cobblestone (and mines back into stone) — the
+        // world never has smooth stone you put there by hand.
+        if (blockToPlace == BlockType.Stone)
+            blockToPlace = BlockType.Cobblestone;
+
         int x = target.X + target.NormalX;
         int y = target.Y + target.NormalY;
         int z = target.Z + target.NormalZ;

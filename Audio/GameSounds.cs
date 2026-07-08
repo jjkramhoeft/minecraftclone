@@ -65,7 +65,7 @@ public class GameSounds
 
     private static Material MaterialOf(BlockType type) => type switch
     {
-        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre or BlockType.IronOre => Material.Stone,
+        BlockType.Stone or BlockType.Cobblestone or BlockType.Bricks or BlockType.CoalOre or BlockType.IronOre => Material.Stone,
         BlockType.Sand => Material.Sand,
         BlockType.Wood or BlockType.Planks or BlockType.BirchLog or BlockType.PineLog => Material.Wood,
         BlockType.Leaves or BlockType.BirchLeaves or BlockType.PineLeaves => Material.Plant,
