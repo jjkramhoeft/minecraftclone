@@ -13,7 +13,7 @@ Minecraft itself as the reference.
 - [ ] Sprint field-of-view kick + swim/splash particles.
 - [ ] Crafting: keep the recipe-list UI (it's honestly friendlier than a grid), but
       gate advanced recipes behind a crafting table block for progression texture.
-- [ ] Star twinkle + moon phases in `Rendering/SkyRenderer.cs`.
+- [x] Star twinkle + moon phases in `Rendering/SkyRenderer.cs`.
 - [x] No fall damage when starting (first fall from the heavens)
 - [x] Debug Terrain Generator: Calculate block frequancy (run and show when F3 is pressed)
 

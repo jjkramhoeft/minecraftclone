@@ -8,6 +8,13 @@ public class FirstPersonCamera
     private const float MouseSensitivity = 0.0025f;
     private const float MaxPitch = MathHelper.PiOver2 - 0.01f;
     private const float FieldOfView = 70f;
+    private const float SprintFovBoost = 8f; // extra degrees while sprinting
+
+    private float _aspectRatio = 1f;
+    private float _fov = FieldOfView; // eased toward the sprint target each frame
+
+    /// <summary>Set by the game loop each frame; the FOV kicks out while true.</summary>
+    public bool SprintFovActive { get; set; }
 
     public Vector3 Position { get; set; }
 
@@ -40,8 +47,24 @@ public class FirstPersonCamera
 
     public void UpdateProjection(float aspectRatio)
     {
+        _aspectRatio = aspectRatio;
+        RebuildProjection();
+    }
+
+    /// <summary>Eases the field of view toward the sprint target and rebuilds
+    /// the projection. Called every frame; the exp-based lerp is frame-rate
+    /// independent so the kick feels the same at any fps.</summary>
+    public void UpdateFov(float dt)
+    {
+        float target = FieldOfView + (SprintFovActive ? SprintFovBoost : 0f);
+        _fov = MathHelper.Lerp(_fov, target, 1f - MathF.Exp(-dt * 9f));
+        RebuildProjection();
+    }
+
+    private void RebuildProjection()
+    {
         Projection = Matrix.CreatePerspectiveFieldOfView(
-            MathHelper.ToRadians(FieldOfView), aspectRatio, 0.1f, 1000f);
+            MathHelper.ToRadians(_fov), _aspectRatio, 0.1f, 1000f);
     }
 
     public void Look(float mouseDeltaX, float mouseDeltaY)

@@ -35,6 +35,9 @@ public class MainGame : Game
     private DayNightCycle _dayNight;
     private SkyRenderer _skyRenderer;
     private CloudRenderer _cloudRenderer;
+    private Particles _particles;
+    private ParticleRenderer _particleRenderer;
+    private float _bubbleTimer;
     private PlayerController _player;
     private BlockInteraction _blockInteraction;
     private BlockHighlight _blockHighlight;
@@ -169,6 +172,8 @@ public class MainGame : Game
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater, _itemDrops);
         WireInteractionEvents();
         _health.Reset();
+        _particles.Clear();
+        _bubbleTimer = 0f;
         _wasInWater = false;
         _stepDistance = 0f;
         _lastStepPosition = _player.Position;
@@ -229,6 +234,8 @@ public class MainGame : Game
         _itemDropRenderer = new ItemDropRenderer(GraphicsDevice, _atlas);
         _skyRenderer = new SkyRenderer(GraphicsDevice, _atlas);
         _cloudRenderer = new CloudRenderer(GraphicsDevice);
+        _particles = new Particles();
+        _particleRenderer = new ParticleRenderer(GraphicsDevice);
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
         _sounds = new GameSounds();
         _itemDrops.PickedUp += _sounds.PlayPickup;
@@ -327,9 +334,12 @@ public class MainGame : Game
             if (IsActive)
                 _hotbar.Update(keyboard, mouse);
             _blockInteraction.Update(_camera, mouse, _previousMouse, IsActive && _mouseCaptured, dt);
-            UpdateMovementSounds();
+            UpdateMovementSounds(dt);
             _health.Update(_player, _chunkManager, dt);
         }
+        _camera.SprintFovActive = _worldActive && _player.IsSprinting;
+        _camera.UpdateFov(dt);
+        _particles.Update(dt);
         _chunkManager.Update(_player.Position);
         _blockUpdater.Update(_chunkManager, _fallingBlocks, dt);
         _fallingBlocks.Update(_chunkManager, _blockUpdater, dt);
@@ -391,7 +401,7 @@ public class MainGame : Game
 
     /// <summary>Footsteps every couple of blocks walked on solid ground, and a
     /// splash when the player's feet enter water.</summary>
-    private void UpdateMovementSounds()
+    private void UpdateMovementSounds(float dt)
     {
         const float StepStride = 2.2f;
 
@@ -399,8 +409,26 @@ public class MainGame : Game
         bool inWater = BlockInfo.IsWater(_chunkManager.GetBlock(
             (int)MathF.Floor(feet.X), (int)MathF.Floor(feet.Y + 0.6f), (int)MathF.Floor(feet.Z)));
         if (inWater && !_wasInWater)
+        {
             _sounds.PlaySplash();
+            // A bigger splash the faster the feet hit the surface.
+            int droplets = 8 + (int)MathHelper.Clamp(-_player.Velocity.Y * 1.5f, 0f, 20f);
+            _particles.SpawnSplash(new Vector3(feet.X, feet.Y + 0.1f, feet.Z), droplets);
+        }
         _wasInWater = inWater;
+
+        // Lazy bubbles trailing off a swimmer while they move.
+        if (inWater)
+        {
+            var swim = _player.Velocity;
+            swim.Y = 0f;
+            _bubbleTimer -= dt;
+            if (_bubbleTimer <= 0f && swim.LengthSquared() > 0.5f)
+            {
+                _bubbleTimer = 0.18f;
+                _particles.SpawnBubble(_player.EyePosition - new Vector3(0f, 0.3f, 0f));
+            }
+        }
 
         if (_player.IsOnGround && !_player.IsFlying && !inWater)
         {
@@ -572,6 +600,7 @@ public class MainGame : Game
             _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);
             _mobRenderer.Draw(_camera, _mobs.All);
             _itemDropRenderer.Draw(GraphicsDevice, _camera, _itemDrops.All);
+            _particleRenderer.Draw(GraphicsDevice, _camera, _particles);
             bool showGameplayUi = !_inventoryScreen.IsOpen && !_chestScreen.IsOpen
                 && _menu.Current == MenuScreen.Mode.Hidden;
             if (showGameplayUi)

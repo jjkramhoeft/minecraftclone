@@ -44,6 +44,10 @@ public class PlayerController
     /// probe keeps the feet from leaving the block they stand on.</summary>
     public bool IsSneaking { get; private set; }
 
+    /// <summary>True while actually running forward on land (LeftControl, moving,
+    /// not sneaking/flying/swimming) — drives the camera FOV kick.</summary>
+    public bool IsSprinting { get; private set; }
+
     public Vector3 EyePosition => Position + new Vector3(0f, IsSneaking ? EyeHeight - 0.12f : EyeHeight, 0f);
 
     /// <summary>Downward speed at the moment of the latest landing, 0 while
@@ -80,6 +84,7 @@ public class PlayerController
         if (IsFlying)
         {
             IsSneaking = false;
+            IsSprinting = false;
             Velocity = wish * FlySpeed;
             if (keyboard.IsKeyDown(Keys.Space)) Velocity.Y = FlyVerticalSpeed;
             else if (keyboard.IsKeyDown(Keys.LeftShift)) Velocity.Y = -FlyVerticalSpeed;
@@ -93,6 +98,8 @@ public class PlayerController
                 (int)MathF.Floor(Position.X),
                 (int)MathF.Floor(Position.Y + 0.6f),
                 (int)MathF.Floor(Position.Z)));
+            IsSprinting = !IsSneaking && !inWater
+                && keyboard.IsKeyDown(Keys.LeftControl) && wish != Vector3.Zero;
 
             if (inWater)
             {
