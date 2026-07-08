@@ -9,6 +9,7 @@ public enum Biome : byte
     Plains,
     Forest,
     Mountains,
+    Lake,
 }
 
 /// <summary>
@@ -33,11 +34,17 @@ public class TerrainGenerator
     private const int RockLine = 64;
     private const int SnowLine = 72;
 
+    // Lake biome: a separate low-frequency field carves broad basins that dip
+    // well below the water level, giving larger, deeper water than the ordinary
+    // valley lakes. The depression is smooth (bowl-shaped) so shores taper in.
+    private const int MaxLakeDepth = 16;
+
     private const int BedrockDepth = 2;     // never carve at or below this — fake bedrock
     private const float CaveThreshold = 0.2f; // tunnel radius: both noise fields within ±this (original value 0.09f)
 
     private readonly FastNoiseLite _heightNoise;
     private readonly FastNoiseLite _biomeNoise;
+    private readonly FastNoiseLite _lakeNoise;
     private readonly FastNoiseLite _caveNoiseA;
     private readonly FastNoiseLite _caveNoiseB;
 
@@ -58,6 +65,12 @@ public class TerrainGenerator
         _biomeNoise = new FastNoiseLite(seed ^ 0x517CC1B7);
         _biomeNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
         _biomeNoise.SetFrequency(0.0018f);
+
+        // Independent low-frequency field for lake basins, so lakes can appear
+        // within any land biome rather than tracking the temperature field.
+        _lakeNoise = new FastNoiseLite(seed ^ 0x63C8A17F);
+        _lakeNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        _lakeNoise.SetFrequency(0.0035f);
 
         // "Spaghetti" caves: a cell is carved where BOTH 3D fields sit near
         // zero, which traces winding tubes instead of open blobs.
@@ -87,7 +100,6 @@ public class TerrainGenerator
                     biomeValue < -0.55f ? Biome.Mountains :
                     biomeValue < -0.15f ? Biome.Forest :
                     Biome.Plains;
-                biomes[x + z * Chunk.SizeX] = (byte)biome;
 
                 // Deserts (high biomeValue) are flat, forests mountainous.
                 float amplitude = MathHelper.Lerp(24f, 9f, (biomeValue + 1f) * 0.5f);
@@ -100,12 +112,24 @@ public class TerrainGenerator
                     amplitude += t * MountainAmplitudeBoost;
                     lift = t * MountainLift;
                 }
+
+                // Lake basins depress the land in a smooth bowl (0 at the rim to
+                // MaxLakeDepth at the center), independent of the land biome.
+                float lakeFactor = SmoothStep01(0.25f, 0.55f, _lakeNoise.GetNoise(worldX, worldZ));
+
                 float noise = _heightNoise.GetNoise(worldX, worldZ); // [-1, 1]
-                int height = (int)MathHelper.Clamp(BaseHeight + lift + noise * amplitude, 1, Chunk.SizeY - 1);
+                int height = (int)MathHelper.Clamp(
+                    BaseHeight + lift + noise * amplitude - lakeFactor * MaxLakeDepth, 1, Chunk.SizeY - 1);
                 heights[x + z * Chunk.SizeX] = height;
-                bool sandy = height <= SandLevel || biome == Biome.Desert;
+
                 // Bare rocky summits above the treeline, snow at the very top.
                 bool rocky = biome == Biome.Mountains && height >= RockLine;
+                // A depressed column that ended up under water is lake bed; the
+                // shore ring keeps its land biome so vegetation transitions.
+                if (lakeFactor > 0.25f && height < WaterLevel)
+                    biome = Biome.Lake;
+                biomes[x + z * Chunk.SizeX] = (byte)biome;
+                bool sandy = height <= SandLevel || biome == Biome.Desert;
 
                 for (int y = 0; y <= height; y++)
                 {
@@ -418,6 +442,13 @@ public class TerrainGenerator
     {
         if (Chunk.InBounds(x, y, z) && chunk.GetBlock(x, y, z) == BlockType.Air)
             chunk.SetBlock(x, y, z, type);
+    }
+
+    /// <summary>Hermite smoothstep: 0 below edge0, 1 above edge1, eased between.</summary>
+    private static float SmoothStep01(float edge0, float edge1, float x)
+    {
+        float t = MathHelper.Clamp((x - edge0) / (edge1 - edge0), 0f, 1f);
+        return t * t * (3f - 2f * t);
     }
 
     // Stable across runs (unlike HashCode.Combine), which saves depend on.
