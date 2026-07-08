@@ -26,13 +26,14 @@ public class GameSounds
     {
         try
         {
+            // Derived units (fs = 22050): fc = -(fs/2π)·ln(1-cutoff01);  T60 = 6.908/decayRate.
             //                      duration  cutoff  decay  tone    toneAmp
-            _dig[(int)Material.Stone] = Synthesize(0.14f, 0.55f, 28f);
-            _dig[(int)Material.Dirt] = Synthesize(0.14f, 0.16f, 32f);
-            _dig[(int)Material.Sand] = Synthesize(0.20f, 0.30f, 18f);
-            _dig[(int)Material.Wood] = Synthesize(0.14f, 0.22f, 26f, toneHz: 170f, toneAmp: 0.55f);
-            _dig[(int)Material.Plant] = Synthesize(0.09f, 0.40f, 48f);
-            _splash = Synthesize(0.55f, 0.12f, 7f);
+            _dig[(int)Material.Stone] = Synthesize(0.14f, 0.55f, 28f);                               // ~2.8 kHz,  T60 0.25 s — hard, bright
+            _dig[(int)Material.Dirt] = Synthesize(0.14f, 0.16f, 32f);                                // ~610 Hz,   T60 0.22 s — soft, dull
+            _dig[(int)Material.Sand] = Synthesize(0.20f, 0.30f, 26f);                                // ~1.25 kHz, T60 0.27 s — granular shuffle
+            _dig[(int)Material.Wood] = Synthesize(0.14f, 0.22f, 26f, toneHz: 235f, toneAmp: 0.55f);  // ~870 Hz + 235 Hz knock, T60 0.27 s
+            _dig[(int)Material.Plant] = Synthesize(0.09f, 0.40f, 48f);                               // ~1.8 kHz,  T60 0.14 s — quick snip
+            _splash = Synthesize(0.55f, 0.18f, 7f);                                                  // ~720 Hz,   T60 0.99 s — long wet tail
             _enabled = true;
         }
         catch (Exception e) when (e is NoAudioHardwareException or DllNotFoundException)
