@@ -74,16 +74,19 @@ public class InventoryScreen
         if (!click)
             return;
 
+        int displayIndex = 0;
         for (int i = 0; i < Recipes.All.Length; i++)
         {
-            if (GetRecipeRowRect(i, screenWidth, screenHeight).Contains(mouse.Position))
+            var recipe = Recipes.All[i];
+            if (!IsVisible(recipe)) // table-only recipes are hidden without a table open
+                continue;
+            if (GetRecipeRowRect(displayIndex, screenWidth, screenHeight).Contains(mouse.Position))
             {
-                var recipe = Recipes.All[i];
-                bool locked = recipe.RequiresTable && !AdvancedUnlocked;
-                if (_held.IsEmpty && !locked) // don't craft with a lifted stack, or when table-gated
+                if (_held.IsEmpty) // don't craft with a lifted stack on the cursor
                     Recipes.TryCraft(recipe, _inventory);
                 return;
             }
+            displayIndex++;
         }
 
         for (int slot = 0; slot < Inventory.Size; slot++)
@@ -150,16 +153,18 @@ public class InventoryScreen
 
     private void DrawRecipes(SpriteBatch spriteBatch, TextureAtlas atlas, PixelFont font, int screenWidth, int screenHeight)
     {
+        int displayIndex = 0;
         for (int i = 0; i < Recipes.All.Length; i++)
         {
             var recipe = Recipes.All[i];
-            var row = GetRecipeRowRect(i, screenWidth, screenHeight);
-            bool locked = recipe.RequiresTable && !AdvancedUnlocked;
-            bool affordable = !locked && Recipes.CanAfford(recipe, _inventory);
-            var tint = locked ? new Color(255, 255, 255, 40)
-                : affordable ? Color.White : new Color(255, 255, 255, 70);
+            if (!IsVisible(recipe)) // table-only recipes are hidden without a table open
+                continue;
+            var row = GetRecipeRowRect(displayIndex, screenWidth, screenHeight);
+            displayIndex++;
+            bool affordable = Recipes.CanAfford(recipe, _inventory);
+            var tint = affordable ? Color.White : new Color(255, 255, 255, 70);
 
-            spriteBatch.Draw(_pixel, row, new Color(0, 0, 0, locked ? 30 : affordable ? 150 : 60));
+            spriteBatch.Draw(_pixel, row, new Color(0, 0, 0, affordable ? 150 : 60));
 
             // Output: icon xN, then a gap, then each input icon xN.
             int x = row.X + 4;
@@ -193,16 +198,29 @@ public class InventoryScreen
         spriteBatch.Draw(atlas.Texture, rect, source, tint);
     }
 
-    private static Rectangle GetPanelRect(int screenWidth, int screenHeight)
+    /// <summary>A recipe is visible when it's hand-craftable, or when a crafting
+    /// table is open (which unlocks the table-only recipes).</summary>
+    private bool IsVisible(Recipe recipe) => AdvancedUnlocked || !recipe.RequiresTable;
+
+    private int VisibleRecipeCount()
+    {
+        int count = 0;
+        foreach (var recipe in Recipes.All)
+            if (IsVisible(recipe))
+                count++;
+        return count;
+    }
+
+    private Rectangle GetPanelRect(int screenWidth, int screenHeight)
     {
         int width = Inventory.Columns * (SlotRenderer.SlotSize + SlotPadding) - SlotPadding + RecipePanelWidth + 48;
         int gridHeight = Inventory.Rows * (SlotRenderer.SlotSize + SlotPadding) - SlotPadding + HotbarGap + 32;
-        int recipeHeight = Recipes.All.Length * (RecipeRowHeight + 4) + 28;
+        int recipeHeight = VisibleRecipeCount() * (RecipeRowHeight + 4) + 28;
         int height = System.Math.Max(gridHeight, recipeHeight);
         return new Rectangle((screenWidth - width) / 2, (screenHeight - height) / 2, width, height);
     }
 
-    private static Rectangle GetRecipeRowRect(int index, int screenWidth, int screenHeight)
+    private Rectangle GetRecipeRowRect(int index, int screenWidth, int screenHeight)
     {
         var panel = GetPanelRect(screenWidth, screenHeight);
         int x = panel.Right - RecipePanelWidth - 16;
@@ -212,7 +230,7 @@ public class InventoryScreen
 
     /// <summary>Slots 6-23 are the three storage rows (top); slots 0-5 (the
     /// hotbar) sit below them with a gap.</summary>
-    private static Rectangle GetSlotRect(int slot, int screenWidth, int screenHeight)
+    private Rectangle GetSlotRect(int slot, int screenWidth, int screenHeight)
     {
         var panel = GetPanelRect(screenWidth, screenHeight);
         int column = slot % Inventory.Columns;
