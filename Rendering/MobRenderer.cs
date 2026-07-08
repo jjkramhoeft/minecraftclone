@@ -139,14 +139,15 @@ public class MobRenderer
         var size = max - min;
         var uv = TextureAtlas.GetUVBounds(tile);
 
+        Span<Vector2> uvs = stackalloc Vector2[]
+        {
+            new(uv.X, uv.W), new(uv.Z, uv.W), new(uv.Z, uv.Y), new(uv.X, uv.Y),
+        };
+
         for (int face = 0; face < 6; face++)
         {
             byte shade = (byte)(255 * FaceShade[face]);
             var color = new Color(shade, shade, shade);
-            Span<Vector2> uvs = stackalloc Vector2[]
-            {
-                new(uv.X, uv.W), new(uv.Z, uv.W), new(uv.Z, uv.Y), new(uv.X, uv.Y),
-            };
 
             for (int i = 0; i < 4; i++)
                 vertices[face * 4 + i] = new VertexPositionColorTexture(min + FaceCorners[face][i] * size, color, uvs[i]);
