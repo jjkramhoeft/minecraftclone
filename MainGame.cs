@@ -48,6 +48,7 @@ public class MainGame : Game
     private MenuScreen _menu;
     private PixelFont _font;
     private DebugOverlay _debugOverlay;
+    private readonly long[] _blockCounts = new long[256]; // scratch for F3 block-frequency
     private GameSounds _sounds;
     private PlayerHealth _health;
     private Furnaces _furnaces;
@@ -300,7 +301,13 @@ public class MainGame : Game
             _camera.ThirdPerson = !_camera.ThirdPerson;
 
         if (keyboard.IsKeyDown(Keys.F3) && _previousKeyboard.IsKeyUp(Keys.F3))
+        {
             _debugOverlay.Visible = !_debugOverlay.Visible;
+            if (_debugOverlay.Visible)
+                BuildBlockFrequency();
+            else
+                _debugOverlay.FreqLines.Clear();
+        }
 
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         if (_chestScreen.IsOpen)
@@ -625,6 +632,40 @@ public class MainGame : Game
 
         _frames = 0;
         _titleTimer = 0;
+    }
+
+    /// <summary>Snapshots the block-type composition of every loaded chunk when
+    /// F3 opens the overlay — a quick read on what the terrain generator is
+    /// actually producing. Percentages are of non-air blocks, sorted descending.</summary>
+    private void BuildBlockFrequency()
+    {
+        var freq = _debugOverlay.FreqLines;
+        freq.Clear();
+        if (_chunkManager == null)
+            return;
+
+        int chunks = _chunkManager.CountBlocks(_blockCounts);
+        long solid = 0;
+        for (int i = 1; i < _blockCounts.Length; i++) // skip air (id 0)
+            solid += _blockCounts[i];
+
+        freq.Add($"BLOCK FREQ - {chunks} CHUNKS");
+        if (solid == 0)
+            return;
+
+        var present = new List<(int Id, long Count)>();
+        for (int i = 1; i < _blockCounts.Length; i++)
+            if (_blockCounts[i] > 0)
+                present.Add((i, _blockCounts[i]));
+        present.Sort((a, b) => b.Count.CompareTo(a.Count));
+
+        int shown = Math.Min(present.Count, 12);
+        for (int i = 0; i < shown; i++)
+        {
+            var (id, count) = present[i];
+            float pct = 100f * count / solid;
+            freq.Add($"{(BlockType)id} {pct:0.0}");
+        }
     }
 
     protected override void UnloadContent()

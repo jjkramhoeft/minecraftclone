@@ -57,6 +57,21 @@ public class ChunkManager : IDisposable
         }
     }
 
+    /// <summary>Tallies block-type occurrences across every loaded chunk into
+    /// <paramref name="counts"/> (indexed by block id; must be length 256) and
+    /// returns the number of chunks sampled. Debug-only — walks raw storage.</summary>
+    public int CountBlocks(long[] counts)
+    {
+        System.Array.Clear(counts, 0, counts.Length);
+        foreach (var chunk in _chunks.Values)
+        {
+            var blocks = chunk.Blocks;
+            for (int i = 0; i < blocks.Length; i++)
+                counts[blocks[i]]++;
+        }
+        return _chunks.Count;
+    }
+
     public ChunkManager(GraphicsDevice device, TerrainGenerator generator, WorldSave save)
     {
         _device = device;

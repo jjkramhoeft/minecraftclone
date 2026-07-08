@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -18,6 +19,10 @@ public class DebugOverlay
 
     /// <summary>Rebuilt once per second; null entries are skipped.</summary>
     public readonly string[] Lines = new string[6];
+
+    /// <summary>Terrain block-frequency snapshot, taken when the overlay is
+    /// toggled on and drawn beneath the per-second stats.</summary>
+    public readonly List<string> FreqLines = new();
 
     private readonly Texture2D _pixel;
 
@@ -41,6 +46,13 @@ public class DebugOverlay
             count++;
             maxWidth = System.Math.Max(maxWidth, PixelFont.MeasureWidth(line, TextScale));
         }
+        foreach (var line in FreqLines)
+        {
+            if (line == null)
+                continue;
+            count++;
+            maxWidth = System.Math.Max(maxWidth, PixelFont.MeasureWidth(line, TextScale));
+        }
         if (count == 0)
             return;
 
@@ -50,6 +62,13 @@ public class DebugOverlay
             new Color(0, 0, 0, 110));
         int y = Padding;
         foreach (var line in Lines)
+        {
+            if (line == null)
+                continue;
+            font.Draw(spriteBatch, line, Padding, y, TextScale, Color.White);
+            y += lineHeight;
+        }
+        foreach (var line in FreqLines)
         {
             if (line == null)
                 continue;
