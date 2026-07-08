@@ -46,6 +46,7 @@ public class MainGame : Game
     private InventoryScreen _inventoryScreen;
     private MenuScreen _menu;
     private PixelFont _font;
+    private DebugOverlay _debugOverlay;
     private GameSounds _sounds;
     private PlayerHealth _health;
     private Furnaces _furnaces;
@@ -234,6 +235,7 @@ public class MainGame : Game
         _chests = new Chests();
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
+        _debugOverlay = new DebugOverlay(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
         _inventoryScreen = new InventoryScreen(GraphicsDevice, _inventory);
         _chestScreen = new ChestScreen(GraphicsDevice, _inventory);
@@ -294,6 +296,9 @@ public class MainGame : Game
 
         if (keyboard.IsKeyDown(Keys.V) && _previousKeyboard.IsKeyUp(Keys.V))
             _camera.ThirdPerson = !_camera.ThirdPerson;
+
+        if (keyboard.IsKeyDown(Keys.F3) && _previousKeyboard.IsKeyUp(Keys.F3))
+            _debugOverlay.Visible = !_debugOverlay.Visible;
 
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         if (_chestScreen.IsOpen)
@@ -568,6 +573,7 @@ public class MainGame : Game
 
             if (showGameplayUi)
                 _hud.Draw(_spriteBatch, _health, width, height);
+            _debugOverlay.Draw(_spriteBatch, _font);
             _hotbar.Draw(_spriteBatch, _atlas, _font, width, height);
             if (_inventoryScreen.IsOpen)
                 _inventoryScreen.Draw(_spriteBatch, _atlas, _font, Mouse.GetState(), width, height);
@@ -594,6 +600,16 @@ public class MainGame : Game
         var pos = _player.Position;
         string mode = _player.IsFlying ? "fly" : _player.IsOnGround ? "walk" : "air";
         Window.Title = $"Minecraft Clone — {_frames} fps | {_chunkManager.LoadedChunkCount} chunks ({_chunkManager.PendingCount} pending) | {pos.X:0.#}, {pos.Y:0.#}, {pos.Z:0.#} [{mode}]";
+
+        if (_debugOverlay.Visible)
+        {
+            _debugOverlay.Lines[0] = $"{_frames} FPS";
+            _debugOverlay.Lines[1] = $"XYZ: {pos.X:0.#} {pos.Y:0.#} {pos.Z:0.#} [{mode}]";
+            _debugOverlay.Lines[2] = $"CHUNKS: {_chunkManager.LoadedChunkCount} ({_chunkManager.PendingCount} PENDING)";
+            _debugOverlay.Lines[3] = $"YAW: {MathHelper.ToDegrees(_camera.Yaw):0} PITCH: {MathHelper.ToDegrees(_camera.Pitch):0}";
+            _debugOverlay.Lines[4] = $"TIME: {_dayNight.TimeOfDay:0.00}";
+        }
+
         _frames = 0;
         _titleTimer = 0;
     }

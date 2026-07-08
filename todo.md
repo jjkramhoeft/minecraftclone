@@ -18,7 +18,7 @@ Minecraft itself as the reference.
 - [ ] **Clouds.** Craft has them and they're cheap: a flat translucent quad layer at
       y≈100 scrolled by time, or noise-sampled cell quads. Big sky-feel win for an
       afternoon of work.
-- [ ] **On-screen debug overlay (F3).** Stats currently go to the window title.
+- [x] **On-screen debug overlay (F3).** Stats currently go to the window title.
       After PixelFont gets letters, draw position/fps/chunk counts as an overlay.
 - [ ] **Tool durability.** `ItemStack` needs a damage value; tools currently last
       forever, which cheapens the tier ladder.
