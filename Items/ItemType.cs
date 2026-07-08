@@ -30,6 +30,7 @@ public enum ItemType : ushort
     // 26 = FurnaceLit, never an item
     Glass = 27,
     Chest = 28,
+    CraftingTable = 29,
 
     Stick = 32,
     WoodenPickaxe = 33,

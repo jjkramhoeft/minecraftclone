@@ -388,6 +388,13 @@ public class MainGame : Game
                 _mouseCaptured = false;
                 return true;
             }
+            if (type == BlockType.CraftingTable)
+            {
+                _inventoryScreen.Open(advanced: true);
+                IsMouseVisible = true;
+                _mouseCaptured = false;
+                return true;
+            }
             return _furnaces.Use(_chunkManager, _inventory, x, y, z);
         };
         _blockInteraction.BlockBrokenAt += (x, y, z, type) =>

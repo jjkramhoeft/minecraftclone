@@ -74,6 +74,8 @@ public class TextureAtlas
         DrawChest(pixels, BlockInfo.TileChestFront, latch: true);
         DrawBucket(pixels, BlockInfo.TileBucket, filled: false);
         DrawBucket(pixels, BlockInfo.TileWaterBucket, filled: true);
+        DrawCraftingTable(pixels, BlockInfo.TileCraftingTop, top: true);
+        DrawCraftingTable(pixels, BlockInfo.TileCraftingSide, top: false);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -180,6 +182,48 @@ public class TextureAtlas
             for (int x = 0; x < TileSize; x++)
                 SetPixel(pixels, BlockInfo.TilePlanks, x, y,
                     seamRow || x == jointX ? seam : Jitter(rng, baseColor, 8));
+        }
+    }
+
+    /// <summary>Crafting table: a planks base, with a 3x3 grid on the top face
+    /// and a framed tool-cubby motif on the sides.</summary>
+    private static void DrawCraftingTable(Color[] pixels, int tile, bool top)
+    {
+        var rng = RngFor(tile);
+        var baseColor = new Color(168, 132, 84);
+        var seam = new Color(110, 84, 50);
+        var dark = new Color(84, 62, 36);
+
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Jitter(rng, baseColor, 7));
+
+        if (top)
+        {
+            // Grid lines at the thirds carve a 3x3 crafting surface.
+            for (int i = 0; i < TileSize; i++)
+            {
+                SetPixel(pixels, tile, i, 5, seam);
+                SetPixel(pixels, tile, i, 10, seam);
+                SetPixel(pixels, tile, 5, i, seam);
+                SetPixel(pixels, tile, 10, i, seam);
+                SetPixel(pixels, tile, i, 0, dark);
+                SetPixel(pixels, tile, i, TileSize - 1, dark);
+                SetPixel(pixels, tile, 0, i, dark);
+                SetPixel(pixels, tile, TileSize - 1, i, dark);
+            }
+        }
+        else
+        {
+            // Plank seams plus a small square "cubby" of tools, bottom-left.
+            for (int y = 0; y < TileSize; y++)
+                if (y % 4 == 3)
+                    for (int x = 0; x < TileSize; x++)
+                        SetPixel(pixels, tile, x, y, seam);
+            for (int y = 8; y <= 13; y++)
+                for (int x = 2; x <= 7; x++)
+                    SetPixel(pixels, tile, x, y,
+                        x == 2 || x == 7 || y == 8 || y == 13 ? dark : Jitter(rng, seam, 6));
         }
     }
 

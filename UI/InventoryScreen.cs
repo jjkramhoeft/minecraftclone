@@ -25,6 +25,10 @@ public class InventoryScreen
 
     public bool IsOpen { get; private set; }
 
+    /// <summary>True while a crafting table is in use — unlocks the table-only
+    /// recipes. The plain E-menu opens with this off.</summary>
+    public bool AdvancedUnlocked { get; private set; }
+
     public InventoryScreen(GraphicsDevice device, Inventory inventory)
     {
         _inventory = inventory;
@@ -32,10 +36,30 @@ public class InventoryScreen
         _pixel.SetData(new[] { Color.White });
     }
 
+    /// <summary>E key: toggle the hand-crafting inventory (basic recipes only).</summary>
     public void Toggle()
     {
-        IsOpen = !IsOpen;
-        if (!IsOpen && !_held.IsEmpty)
+        if (IsOpen)
+            Close();
+        else
+            Open(advanced: false);
+    }
+
+    /// <summary>Right-clicking a crafting table opens the same screen with the
+    /// advanced recipes unlocked.</summary>
+    public void Open(bool advanced)
+    {
+        IsOpen = true;
+        AdvancedUnlocked = advanced;
+    }
+
+    public void Close()
+    {
+        if (!IsOpen)
+            return;
+        IsOpen = false;
+        AdvancedUnlocked = false;
+        if (!_held.IsEmpty)
         {
             // Never void a lifted stack on close — it always fits back in
             // because it just came out of the inventory.
@@ -54,8 +78,10 @@ public class InventoryScreen
         {
             if (GetRecipeRowRect(i, screenWidth, screenHeight).Contains(mouse.Position))
             {
-                if (_held.IsEmpty) // don't craft with a lifted stack — it isn't counted
-                    Recipes.TryCraft(Recipes.All[i], _inventory);
+                var recipe = Recipes.All[i];
+                bool locked = recipe.RequiresTable && !AdvancedUnlocked;
+                if (_held.IsEmpty && !locked) // don't craft with a lifted stack, or when table-gated
+                    Recipes.TryCraft(recipe, _inventory);
                 return;
             }
         }
@@ -128,10 +154,12 @@ public class InventoryScreen
         {
             var recipe = Recipes.All[i];
             var row = GetRecipeRowRect(i, screenWidth, screenHeight);
-            bool affordable = Recipes.CanAfford(recipe, _inventory);
-            var tint = affordable ? Color.White : new Color(255, 255, 255, 70);
+            bool locked = recipe.RequiresTable && !AdvancedUnlocked;
+            bool affordable = !locked && Recipes.CanAfford(recipe, _inventory);
+            var tint = locked ? new Color(255, 255, 255, 40)
+                : affordable ? Color.White : new Color(255, 255, 255, 70);
 
-            spriteBatch.Draw(_pixel, row, new Color(0, 0, 0, affordable ? 150 : 60));
+            spriteBatch.Draw(_pixel, row, new Color(0, 0, 0, locked ? 30 : affordable ? 150 : 60));
 
             // Output: icon xN, then a gap, then each input icon xN.
             int x = row.X + 4;

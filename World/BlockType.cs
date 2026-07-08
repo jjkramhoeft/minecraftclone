@@ -34,4 +34,5 @@ public enum BlockType : byte
     FurnaceLit = 26, // furnace mid-smelt: emits light, never an item
     Glass = 27,
     Chest = 28,
+    CraftingTable = 29,
 }

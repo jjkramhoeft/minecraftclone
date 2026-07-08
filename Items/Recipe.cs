@@ -1,28 +1,33 @@
 namespace MinecraftClone.Items;
 
-/// <summary>A shapeless recipe: consume the inputs, receive the output.</summary>
-public record Recipe(ItemStack Output, (ItemType Item, int Count)[] Inputs);
+/// <summary>A shapeless recipe: consume the inputs, receive the output.
+/// <paramref name="RequiresTable"/> recipes are only craftable with a crafting
+/// table open; the rest can be made by hand from the inventory screen.</summary>
+public record Recipe(ItemStack Output, (ItemType Item, int Count)[] Inputs, bool RequiresTable = false);
 
 public static class Recipes
 {
     public static readonly Recipe[] All =
     {
+        // Hand-craftable basics.
         new(new ItemStack(ItemType.Planks, 4), new[] { (ItemType.Wood, 1) }),
         new(new ItemStack(ItemType.Stick, 4), new[] { (ItemType.Planks, 2) }),
         new(new ItemStack(ItemType.Bricks, 4), new[] { (ItemType.Sand, 4) }),
-        new(new ItemStack(ItemType.WoodenPickaxe, 1), new[] { (ItemType.Planks, 3), (ItemType.Stick, 2) }),
-        new(new ItemStack(ItemType.WoodenAxe, 1), new[] { (ItemType.Planks, 3), (ItemType.Stick, 2) }),
-        new(new ItemStack(ItemType.WoodenShovel, 1), new[] { (ItemType.Planks, 1), (ItemType.Stick, 2) }),
-        new(new ItemStack(ItemType.StonePickaxe, 1), new[] { (ItemType.Stone, 3), (ItemType.Stick, 2) }),
-        new(new ItemStack(ItemType.StoneAxe, 1), new[] { (ItemType.Stone, 3), (ItemType.Stick, 2) }),
-        new(new ItemStack(ItemType.StoneShovel, 1), new[] { (ItemType.Stone, 1), (ItemType.Stick, 2) }),
         new(new ItemStack(ItemType.Torch, 4), new[] { (ItemType.Coal, 1), (ItemType.Stick, 1) }),
-        new(new ItemStack(ItemType.Furnace, 1), new[] { (ItemType.Stone, 8) }),
-        new(new ItemStack(ItemType.Chest, 1), new[] { (ItemType.Planks, 8) }),
-        new(new ItemStack(ItemType.IronPickaxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }),
-        new(new ItemStack(ItemType.IronAxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }),
-        new(new ItemStack(ItemType.IronShovel, 1), new[] { (ItemType.IronIngot, 1), (ItemType.Stick, 2) }),
-        new(new ItemStack(ItemType.Bucket, 1), new[] { (ItemType.IronIngot, 3) }),
+        new(new ItemStack(ItemType.CraftingTable, 1), new[] { (ItemType.Planks, 4) }),
+        // Table-only: tools and the utility blocks.
+        new(new ItemStack(ItemType.WoodenPickaxe, 1), new[] { (ItemType.Planks, 3), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.WoodenAxe, 1), new[] { (ItemType.Planks, 3), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.WoodenShovel, 1), new[] { (ItemType.Planks, 1), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.StonePickaxe, 1), new[] { (ItemType.Stone, 3), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.StoneAxe, 1), new[] { (ItemType.Stone, 3), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.StoneShovel, 1), new[] { (ItemType.Stone, 1), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.Furnace, 1), new[] { (ItemType.Stone, 8) }, RequiresTable: true),
+        new(new ItemStack(ItemType.Chest, 1), new[] { (ItemType.Planks, 8) }, RequiresTable: true),
+        new(new ItemStack(ItemType.IronPickaxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.IronAxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.IronShovel, 1), new[] { (ItemType.IronIngot, 1), (ItemType.Stick, 2) }, RequiresTable: true),
+        new(new ItemStack(ItemType.Bucket, 1), new[] { (ItemType.IronIngot, 3) }, RequiresTable: true),
     };
 
     /// <summary>Inputs available (room for the output is only checked by TryCraft).</summary>

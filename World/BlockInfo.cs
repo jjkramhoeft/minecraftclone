@@ -79,6 +79,8 @@ public static class BlockInfo
     public const int TileChestFront = 47;
     public const int TileBucket = 48;
     public const int TileWaterBucket = 49;
+    public const int TileCraftingTop = 50;
+    public const int TileCraftingSide = 51;
 
     /// <summary>Solid blocks collide and cast ambient occlusion. Plants are
     /// deliberately NOT solid — you walk through them.</summary>
@@ -92,7 +94,7 @@ public static class BlockInfo
 
     /// <summary>Blocks that respond to right-click instead of being built against.</summary>
     public static bool IsInteractable(BlockType type) =>
-        type is BlockType.Furnace or BlockType.FurnaceLit or BlockType.Chest;
+        type is BlockType.Furnace or BlockType.FurnaceLit or BlockType.Chest or BlockType.CraftingTable;
 
     /// <summary>Source water and every flowing/falling variant.</summary>
     public static bool IsWater(BlockType type) =>
@@ -175,6 +177,12 @@ public static class BlockInfo
             BlockFace.South => TileChestFront, // no orientation; latch faces +Z
             _ => TileChestSide,
         },
+        BlockType.CraftingTable => face switch
+        {
+            BlockFace.Top => TileCraftingTop,
+            BlockFace.Bottom => TilePlanks,
+            _ => TileCraftingSide,
+        },
         _ when IsWater(type) => TileWater,
         _ => TileDirt,
     };
@@ -186,7 +194,7 @@ public static class BlockInfo
         BlockType.Grass or BlockType.Dirt or BlockType.Sand => 0.75f,
         BlockType.Leaves => 0.3f,
         BlockType.Wood => 2f,
-        BlockType.Planks or BlockType.Chest => 1.5f,
+        BlockType.Planks or BlockType.Chest or BlockType.CraftingTable => 1.5f,
         BlockType.Stone or BlockType.Bricks or BlockType.Furnace or BlockType.FurnaceLit => 4f,
         BlockType.CoalOre or BlockType.IronOre => 5f,
         BlockType.Glass => 0.4f,
@@ -198,7 +206,8 @@ public static class BlockInfo
     {
         BlockType.Stone or BlockType.Bricks or BlockType.CoalOre or BlockType.IronOre
             or BlockType.Furnace or BlockType.FurnaceLit => ToolClass.Pickaxe,
-        BlockType.Wood or BlockType.Planks or BlockType.Leaves or BlockType.Chest => ToolClass.Axe,
+        BlockType.Wood or BlockType.Planks or BlockType.Leaves or BlockType.Chest
+            or BlockType.CraftingTable => ToolClass.Axe,
         BlockType.Grass or BlockType.Dirt or BlockType.Sand => ToolClass.Shovel,
         _ => ToolClass.None,
     };
