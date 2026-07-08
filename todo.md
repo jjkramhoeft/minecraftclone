@@ -13,6 +13,7 @@ Minecraft itself as the reference.
 - [ ] Only show available recipies (if not at CraftingTable do not show recipies from crafting table)
 - [ ] Hold active tool in hand. Visual improvement. Currently the players hands are alway empty, 
       even when a tool is equipped (make pickaxe, axe, shovel and bucket)
+- [ ] Stars should not be visible through the clouds
 
 ## Future ideas (not ready yet)
 
@@ -21,7 +22,6 @@ Minecraft itself as the reference.
       Snow, Limestone, Goldore, Gold, Fern, Cactus
 - [ ] Add 'blob' caves in mountain biomes, with goldore
 - [ ] Enemies
-- [ ] Stars should not be visible through the clouds
 - [ ] Better break up decal. Do not use the current ramdom 'splatter' - there should be progression 
       and some build up in the dark pattern.
 - [ ] Better cobblestone texture      
