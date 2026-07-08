@@ -64,6 +64,8 @@ public class TextureAtlas
         DrawLump(pixels, BlockInfo.TileCoal, new Color(38, 38, 40));
         DrawIngot(pixels, BlockInfo.TileIronIngot, IronHeadColor);
         DrawTorch(pixels);
+        DrawSpeckled(pixels, BlockInfo.TilePig, new Color(232, 160, 150), 8);
+        DrawSpeckled(pixels, BlockInfo.TileChicken, new Color(238, 236, 230), 6);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);

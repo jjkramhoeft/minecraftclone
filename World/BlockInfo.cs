@@ -68,6 +68,9 @@ public static class BlockInfo
     public const int TileCoal = 37;
     public const int TileIronIngot = 38;
     public const int TileTorch = 39;
+    // Mob skins (never on block faces)
+    public const int TilePig = 40;
+    public const int TileChicken = 41;
 
     /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
     /// occlusion. Plants are deliberately NOT solid — you walk through them.</summary>

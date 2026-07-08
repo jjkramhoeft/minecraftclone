@@ -21,28 +21,32 @@ public static class PlayerPhysics
     private const float Skin = 0.001f;
 
     /// <param name="hitWall">True when the move was blocked horizontally.</param>
-    /// <returns>True when the player ended the move standing on solid ground.</returns>
-    public static bool MoveWithCollision(ref Vector3 position, ref Vector3 velocity, ChunkManager world, float dt, out bool hitWall)
+    /// <param name="halfWidth">Box half-extent in X/Z; defaults to the player's.</param>
+    /// <param name="height">Box height; defaults to the player's.</param>
+    /// <returns>True when the box ended the move standing on solid ground.</returns>
+    public static bool MoveWithCollision(ref Vector3 position, ref Vector3 velocity, ChunkManager world, float dt, out bool hitWall,
+        float halfWidth = HalfWidth, float height = Height)
     {
         bool onGround = false;
         hitWall = false;
-        MoveAxis(ref position.Y, ref velocity.Y, velocity.Y * dt, Axis.Y, ref position, world, ref onGround, ref hitWall);
-        MoveAxis(ref position.X, ref velocity.X, velocity.X * dt, Axis.X, ref position, world, ref onGround, ref hitWall);
-        MoveAxis(ref position.Z, ref velocity.Z, velocity.Z * dt, Axis.Z, ref position, world, ref onGround, ref hitWall);
+        MoveAxis(ref position.Y, ref velocity.Y, velocity.Y * dt, Axis.Y, ref position, world, ref onGround, ref hitWall, halfWidth, height);
+        MoveAxis(ref position.X, ref velocity.X, velocity.X * dt, Axis.X, ref position, world, ref onGround, ref hitWall, halfWidth, height);
+        MoveAxis(ref position.Z, ref velocity.Z, velocity.Z * dt, Axis.Z, ref position, world, ref onGround, ref hitWall, halfWidth, height);
         return onGround;
     }
 
     private enum Axis { X, Y, Z }
 
-    private static void MoveAxis(ref float positionAxis, ref float velocityAxis, float delta, Axis axis, ref Vector3 position, ChunkManager world, ref bool onGround, ref bool hitWall)
+    private static void MoveAxis(ref float positionAxis, ref float velocityAxis, float delta, Axis axis, ref Vector3 position, ChunkManager world, ref bool onGround, ref bool hitWall,
+        float halfWidth, float height)
     {
         if (delta == 0f)
             return;
 
         positionAxis += delta;
 
-        var min = new Vector3(position.X - HalfWidth, position.Y, position.Z - HalfWidth);
-        var max = new Vector3(position.X + HalfWidth, position.Y + Height, position.Z + HalfWidth);
+        var min = new Vector3(position.X - halfWidth, position.Y, position.Z - halfWidth);
+        var max = new Vector3(position.X + halfWidth, position.Y + height, position.Z + halfWidth);
 
         // Blocks overlapped by the box. The tiny epsilon keeps a box whose face
         // sits exactly on a block boundary from counting the cell beyond it.
@@ -74,8 +78,8 @@ public static class PlayerPhysics
             return;
 
         // Snap the box flush against the blocking face and stop on this axis.
-        float minOffset = axis == Axis.Y ? 0f : HalfWidth;  // box min relative to position
-        float maxOffset = axis == Axis.Y ? Height : HalfWidth;
+        float minOffset = axis == Axis.Y ? 0f : halfWidth;  // box min relative to position
+        float maxOffset = axis == Axis.Y ? height : halfWidth;
         positionAxis = delta > 0
             ? bound - maxOffset - Skin
             : bound + minOffset + Skin;

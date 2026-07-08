@@ -41,7 +41,7 @@ Minecraft itself as the reference.
       velocity in `Player/PlayerPhysics.cs` (velocity is already known at landing),
       air meter while the eye cell is water, death → respawn at spawn point, keep it
       simple: drop nothing on death at first.
-- [ ] **Simple mobs.** Even 1–2 passive animals (chicken/pig analogue) wandering on
+- [x] **Simple mobs.** Even 1–2 passive animals (chicken/pig analogue) wandering on
       land makes the world feel inhabited. The `Rendering/PlayerModel.cs` box-model +
       walk-swing animation code generalizes to quadrupeds; `FallingBlocks` shows the
       entity-update pattern. Hostiles can wait — pathfinding is the hard part.

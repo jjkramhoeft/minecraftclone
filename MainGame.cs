@@ -25,6 +25,8 @@ public class MainGame : Game
     private BlockUpdater _blockUpdater;
     private FallingBlocks _fallingBlocks;
     private FallingBlockRenderer _fallingBlockRenderer;
+    private Mobs _mobs;
+    private MobRenderer _mobRenderer;
     private DayNightCycle _dayNight;
     private SkyRenderer _skyRenderer;
     private PlayerController _player;
@@ -117,6 +119,8 @@ public class MainGame : Game
         _blockUpdater = new BlockUpdater();
         _fallingBlocks = new FallingBlocks();
         _fallingBlockRenderer = new FallingBlockRenderer(GraphicsDevice, _atlas);
+        _mobs = new Mobs();
+        _mobRenderer = new MobRenderer(GraphicsDevice, _atlas);
         _skyRenderer = new SkyRenderer(GraphicsDevice, _atlas);
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
@@ -172,6 +176,7 @@ public class MainGame : Game
         _chunkManager.Update(_player.Position);
         _blockUpdater.Update(_chunkManager, _fallingBlocks, dt);
         _fallingBlocks.Update(_chunkManager, _blockUpdater, dt);
+        _mobs.Update(_chunkManager, _player.Position, dt);
         _dayNight.Update(dt);
         _playerModel.Update(_player, dt, !_inventoryScreen.IsOpen && _blockInteraction.IsMining);
 
@@ -204,6 +209,7 @@ public class MainGame : Game
         _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
         _blockUpdater = new BlockUpdater();
         _fallingBlocks.Clear();
+        _mobs.Clear();
         _player = new PlayerController(new Vector3(8.5f, 70f, 8.5f));
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         WireInteractionEvents();
@@ -367,9 +373,11 @@ public class MainGame : Game
         _worldRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
         _playerModel.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
         _fallingBlockRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
+        _mobRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
 
         _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
         _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);
+        _mobRenderer.Draw(_camera, _mobs.All);
         if (!_inventoryScreen.IsOpen)
         {
             if (_blockInteraction.IsMining)
