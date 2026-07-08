@@ -56,6 +56,13 @@ public class TextureAtlas
         DrawFace(pixels);
         DrawDisc(pixels, BlockInfo.TileSun, new Color(255, 236, 160), new Color(255, 196, 90));
         DrawDisc(pixels, BlockInfo.TileMoon, new Color(226, 228, 240), new Color(180, 184, 205));
+        DrawOre(pixels, BlockInfo.TileCoalOre, new Color(38, 38, 40));
+        DrawOre(pixels, BlockInfo.TileIronOre, new Color(216, 168, 128));
+        DrawTool(pixels, BlockInfo.TileIronPickaxe, IronHeadColor, ToolShape.Pickaxe);
+        DrawTool(pixels, BlockInfo.TileIronAxe, IronHeadColor, ToolShape.Axe);
+        DrawTool(pixels, BlockInfo.TileIronShovel, IronHeadColor, ToolShape.Shovel);
+        DrawLump(pixels, BlockInfo.TileCoal, new Color(38, 38, 40));
+        DrawIngot(pixels, BlockInfo.TileIronIngot, IronHeadColor);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -186,6 +193,7 @@ public class TextureAtlas
     private static readonly Color HandleColor = new(102, 81, 50);
     private static readonly Color WoodHeadColor = new(168, 132, 84);
     private static readonly Color StoneHeadColor = new(125, 125, 125);
+    private static readonly Color IronHeadColor = new(216, 216, 224);
 
     private enum ToolShape { Pickaxe, Axe, Shovel }
 
@@ -355,6 +363,62 @@ public class TextureAtlas
                 y += rng.Next(-1, 2);
             }
         }
+    }
+
+    /// <summary>Ore block face: stone speckle with a few 2x2-ish mineral spots.</summary>
+    private static void DrawOre(Color[] pixels, int tile, Color mineral)
+    {
+        var rng = RngFor(tile);
+        var stone = new Color(125, 125, 125);
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Jitter(rng, stone, 9));
+
+        for (int spot = 0; spot < 6; spot++)
+        {
+            int sx = rng.Next(1, TileSize - 2);
+            int sy = rng.Next(1, TileSize - 2);
+            SetPixel(pixels, tile, sx, sy, Jitter(rng, mineral, 12));
+            SetPixel(pixels, tile, sx + 1, sy, Jitter(rng, mineral, 12));
+            SetPixel(pixels, tile, sx, sy + 1, Jitter(rng, mineral, 12));
+            if (rng.Next(2) == 0)
+                SetPixel(pixels, tile, sx + 1, sy + 1, Jitter(rng, mineral, 12));
+        }
+    }
+
+    /// <summary>Item icon: an irregular rounded lump on a transparent background.</summary>
+    private static void DrawLump(Color[] pixels, int tile, Color color)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Color.Transparent);
+
+        var rng = RngFor(tile);
+        for (int y = 0; y < TileSize; y++)
+        {
+            for (int x = 0; x < TileSize; x++)
+            {
+                float dist = MathF.Sqrt((x - 7.5f) * (x - 7.5f) + (y - 8f) * (y - 8f));
+                if (dist < 4.5f + rng.Next(2))
+                    SetPixel(pixels, tile, x, y, Jitter(rng, color, 14));
+            }
+        }
+    }
+
+    /// <summary>Item icon: a metal bar with a highlighted top edge.</summary>
+    private static void DrawIngot(Color[] pixels, int tile, Color metal)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Color.Transparent);
+
+        var rng = RngFor(tile);
+        var shadow = new Color(metal.R * 3 / 4, metal.G * 3 / 4, metal.B * 3 / 4);
+        for (int y = 6; y <= 11; y++)
+            for (int x = 2; x <= 13; x++)
+                SetPixel(pixels, tile, x, y, Jitter(rng, y >= 10 ? shadow : metal, 6));
+        for (int x = 3; x <= 12; x++)
+            SetPixel(pixels, tile, x, 5, Color.White * 0.9f); // top-edge glint
     }
 
     private static void DrawStick(Color[] pixels)

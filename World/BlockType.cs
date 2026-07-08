@@ -27,4 +27,6 @@ public enum BlockType : byte
     WaterFlow7 = 20,
     // Water that arrived by falling; full height, sustained only by water above.
     WaterFall = 21,
+    CoalOre = 22,
+    IronOre = 23,
 }

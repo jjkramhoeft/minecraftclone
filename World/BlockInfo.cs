@@ -59,6 +59,14 @@ public static class BlockInfo
     // Sky sprites (never on block faces)
     public const int TileSun = 30;
     public const int TileMoon = 31;
+    public const int TileCoalOre = 32;
+    public const int TileIronOre = 33;
+    // UI-only item icons
+    public const int TileIronPickaxe = 34;
+    public const int TileIronAxe = 35;
+    public const int TileIronShovel = 36;
+    public const int TileCoal = 37;
+    public const int TileIronIngot = 38;
 
     /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
     /// occlusion. Plants are deliberately NOT solid — you walk through them.</summary>
@@ -119,6 +127,8 @@ public static class BlockInfo
         BlockType.FlowerYellow => TileFlowerYellow,
         BlockType.FlowerPoppy => TileFlowerPoppy,
         BlockType.Reeds => TileReeds,
+        BlockType.CoalOre => TileCoalOre,
+        BlockType.IronOre => TileIronOre,
         _ when IsWater(type) => TileWater,
         _ => TileDirt,
     };
@@ -132,13 +142,14 @@ public static class BlockInfo
         BlockType.Wood => 2f,
         BlockType.Planks => 1.5f,
         BlockType.Stone or BlockType.Bricks => 4f,
+        BlockType.CoalOre or BlockType.IronOre => 5f,
         _ when IsPlant(type) => 0f, // instant break
         _ => 1f,
     };
 
     public static ToolClass GetEffectiveTool(BlockType type) => type switch
     {
-        BlockType.Stone or BlockType.Bricks => ToolClass.Pickaxe,
+        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre or BlockType.IronOre => ToolClass.Pickaxe,
         BlockType.Wood or BlockType.Planks or BlockType.Leaves => ToolClass.Axe,
         BlockType.Grass or BlockType.Dirt or BlockType.Sand => ToolClass.Shovel,
         _ => ToolClass.None,
@@ -148,7 +159,8 @@ public static class BlockInfo
     /// Mining below the tier still breaks the block (slowly) but yields nothing.</summary>
     public static int GetRequiredTier(BlockType type) => type switch
     {
-        BlockType.Stone or BlockType.Bricks => 1,
+        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre => 1,
+        BlockType.IronOre => 2,
         _ => 0,
     };
 

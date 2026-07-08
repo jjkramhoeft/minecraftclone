@@ -14,7 +14,7 @@ Minecraft itself as the reference.
       Right now underground is solid stone, so mining has no reward loop. Skip carving
       below y≈4 to fake bedrock. Watch interaction with `WaterLevel` (don't breach the
       ocean floor, or embrace it and let water pour in — the flow sim already handles it).
-- [ ] **Ores.** Coal + iron as new `BlockType`s with depth-banded spawn blobs. Coal
+- [x] **Ores.** Coal + iron as new `BlockType`s with depth-banded spawn blobs. Coal
       enables torches; iron enables a tier-3 tool set on the existing
       `GetRequiredTier`/`GetToolTier` scaffolding in `World/BlockInfo.cs` /
       `Items/ItemInfo.cs`. Without ores the stone tier is a dead end.

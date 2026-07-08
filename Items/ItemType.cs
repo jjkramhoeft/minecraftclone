@@ -22,6 +22,9 @@ public enum ItemType : ushort
     FlowerYellow = 11,
     FlowerPoppy = 12,
     Reeds = 13,
+    // 14-21 = water variants, never items
+    CoalOre = 22,
+    IronOre = 23,
 
     Stick = 32,
     WoodenPickaxe = 33,
@@ -30,4 +33,9 @@ public enum ItemType : ushort
     StoneAxe = 36,
     WoodenShovel = 37,
     StoneShovel = 38,
+    Coal = 39,
+    IronIngot = 40,
+    IronPickaxe = 41,
+    IronAxe = 42,
+    IronShovel = 43,
 }

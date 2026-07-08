@@ -24,17 +24,18 @@ public static class ItemInfo
 
     public static ToolClass GetToolClass(ItemType item) => item switch
     {
-        ItemType.WoodenPickaxe or ItemType.StonePickaxe => ToolClass.Pickaxe,
-        ItemType.WoodenAxe or ItemType.StoneAxe => ToolClass.Axe,
-        ItemType.WoodenShovel or ItemType.StoneShovel => ToolClass.Shovel,
+        ItemType.WoodenPickaxe or ItemType.StonePickaxe or ItemType.IronPickaxe => ToolClass.Pickaxe,
+        ItemType.WoodenAxe or ItemType.StoneAxe or ItemType.IronAxe => ToolClass.Axe,
+        ItemType.WoodenShovel or ItemType.StoneShovel or ItemType.IronShovel => ToolClass.Shovel,
         _ => ToolClass.None,
     };
 
-    /// <summary>0 = hand, 1 = wooden tools, 2 = stone tools.</summary>
+    /// <summary>0 = hand, 1 = wooden tools, 2 = stone tools, 3 = iron tools.</summary>
     public static int GetToolTier(ItemType item) => item switch
     {
         ItemType.WoodenPickaxe or ItemType.WoodenAxe or ItemType.WoodenShovel => 1,
         ItemType.StonePickaxe or ItemType.StoneAxe or ItemType.StoneShovel => 2,
+        ItemType.IronPickaxe or ItemType.IronAxe or ItemType.IronShovel => 3,
         _ => 0,
     };
 
@@ -44,6 +45,7 @@ public static class ItemInfo
         BlockType.Grass => ItemType.Dirt,
         BlockType.Leaves => ItemType.None,
         BlockType.Air => ItemType.None,
+        BlockType.CoalOre => ItemType.Coal,
         _ when BlockInfo.IsWater(block) => ItemType.None,
         _ => FromBlock(block),
     };
@@ -62,6 +64,11 @@ public static class ItemInfo
             ItemType.StoneAxe => BlockInfo.TileStoneAxe,
             ItemType.WoodenShovel => BlockInfo.TileWoodenShovel,
             ItemType.StoneShovel => BlockInfo.TileStoneShovel,
+            ItemType.IronPickaxe => BlockInfo.TileIronPickaxe,
+            ItemType.IronAxe => BlockInfo.TileIronAxe,
+            ItemType.IronShovel => BlockInfo.TileIronShovel,
+            ItemType.Coal => BlockInfo.TileCoal,
+            ItemType.IronIngot => BlockInfo.TileIronIngot,
             _ => BlockInfo.TileDirt,
         };
     }

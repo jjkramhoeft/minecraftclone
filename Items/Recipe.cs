@@ -16,6 +16,11 @@ public static class Recipes
         new(new ItemStack(ItemType.StonePickaxe, 1), new[] { (ItemType.Stone, 3), (ItemType.Stick, 2) }),
         new(new ItemStack(ItemType.StoneAxe, 1), new[] { (ItemType.Stone, 3), (ItemType.Stick, 2) }),
         new(new ItemStack(ItemType.StoneShovel, 1), new[] { (ItemType.Stone, 1), (ItemType.Stick, 2) }),
+        // Placeholder until the furnace exists: "smelt" ore by hand.
+        new(new ItemStack(ItemType.IronIngot, 1), new[] { (ItemType.IronOre, 1), (ItemType.Coal, 1) }),
+        new(new ItemStack(ItemType.IronPickaxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }),
+        new(new ItemStack(ItemType.IronAxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }),
+        new(new ItemStack(ItemType.IronShovel, 1), new[] { (ItemType.IronIngot, 1), (ItemType.Stick, 2) }),
     };
 
     /// <summary>Inputs available (room for the output is only checked by TryCraft).</summary>

@@ -81,9 +81,42 @@ public class TerrainGenerator
             }
         }
 
+        PlaceOres(chunk);
         PlantTrees(chunk, heights);
         ScatterFlowers(chunk, heights);
         GrowReeds(chunk, heights);
+    }
+
+    /// <summary>
+    /// Depth-banded ore blobs, seeded per chunk so placement is stable across
+    /// runs. Blobs only replace stone, so they never poke out of hillsides or
+    /// into caves. Coal is common and shallow; iron is rarer and deep.
+    /// </summary>
+    private void PlaceOres(Chunk chunk)
+    {
+        var rng = new Random(Hash(chunk.Coord.X, chunk.Coord.Z, Seed ^ 0x0AB1C4D3));
+        PlaceOreBlobs(chunk, rng, BlockType.CoalOre, count: 8, minY: 5, maxY: 52);
+        PlaceOreBlobs(chunk, rng, BlockType.IronOre, count: 5, minY: 5, maxY: 30);
+    }
+
+    private static void PlaceOreBlobs(Chunk chunk, Random rng, BlockType ore, int count, int minY, int maxY)
+    {
+        for (int blob = 0; blob < count; blob++)
+        {
+            int cx = rng.Next(Chunk.SizeX);
+            int cy = rng.Next(minY, maxY + 1);
+            int cz = rng.Next(Chunk.SizeZ);
+            int size = rng.Next(4, 10); // blocks per blob (attempted)
+
+            for (int i = 0; i < size; i++)
+            {
+                int x = cx + rng.Next(-1, 2);
+                int y = cy + rng.Next(-1, 2);
+                int z = cz + rng.Next(-1, 2);
+                if (Chunk.InBounds(x, y, z) && chunk.GetBlock(x, y, z) == BlockType.Stone)
+                    chunk.SetBlock(x, y, z, ore);
+            }
+        }
     }
 
     /// <summary>
