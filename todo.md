@@ -14,14 +14,16 @@ Minecraft itself as the reference.
       lower frequency (birch as 5% of trees and pine as 10% of trees). Birch should have slightly lighter green leaves and whitish trunks and same sape as normal trees. Pine should have slightly darker green leaves(needles) and a cone shape
 - [-] More plants/flowers: Add a fern plant. it can spawn under/close to pine trees   
 - [ ] More Blocks: Add a Cobblestone block. It is not spawn by the normal world generator, but
-      instead when stone is placed it is placed as cobblestone, and if cobblestone is mined it is collected as stone. 
+      instead when stone is placed it is placed as cobblestone, and if cobblestone is mined it is collected as stone.
+- [ ] Fix lighting in caves/under ground. It's supposed to be dark underground, no matter what 
+      time of day it is. Currently it is light in caves under ground at daytime. Torches should be the main light source under ground.
 
 ## Future ideas (not ready yet)
 
 - [ ] More biomes: Mountains, Pine forest, Ocean
 - [ ] More Blocks: Cobblestone (placed stone), Clay, Bricks (from furnaced clay), Cravel, 
       Snow, Limestone, Goldore, Gold, Fern, Cactus
-- [ ] Add 'blob' caves
+- [ ] Add 'blob' caves in mountain biomes, with goldore
 - [ ] Enemies
 - [ ] Player skins
 - [ ] Hold active tool in hand. Visual improvement
