@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using MinecraftClone.Items;
 using MinecraftClone.Player;
 using MinecraftClone.World;
 
@@ -41,6 +42,11 @@ public class PlayerModel
     private float _walkPhase;
     private float _walkBlend; // eases limbs back to rest when stopping
     private float _swingTimer;
+
+    // Reused geometry for the flat held-item sprite (tools/bucket) — mutated in
+    // place each frame so first-person drawing stays allocation-free.
+    private readonly VertexPositionColorTexture[] _itemQuad = new VertexPositionColorTexture[4];
+    private static readonly short[] ItemQuadIndices = { 0, 1, 2, 0, 2, 3 };
 
     public PlayerModel(GraphicsDevice device, TextureAtlas atlas)
     {
@@ -111,7 +117,7 @@ public class PlayerModel
         DrawPart(_leftLeg, Matrix.CreateRotationX(walk), body, camera);
     }
 
-    public void DrawFirstPersonArm(FirstPersonCamera camera)
+    public void DrawFirstPersonArm(FirstPersonCamera camera, ItemType heldItem)
     {
         // Fresh depth so the arm draws over the world and never clips into it.
         _device.Clear(ClearOptions.DepthBuffer, Color.CornflowerBlue, 1f, 0);
@@ -126,6 +132,40 @@ public class PlayerModel
         _effect.View = camera.View;
         _effect.Projection = camera.Projection;
         DrawGeometry(_rightArm);
+
+        if (ItemInfo.IsHeldInHand(heldItem))
+            DrawHeldItem(camera, heldItem, bob);
+    }
+
+    /// <summary>Draws the equipped tool/bucket as a flat, angled sprite gripped
+    /// in the fist — a simple viewmodel rather than a voxelised item.</summary>
+    private void DrawHeldItem(FirstPersonCamera camera, ItemType item, float bob)
+    {
+        var uv = TextureAtlas.GetUVBounds(ItemInfo.GetIconTile(item));
+        // Upright unit quad in its own XY plane, wound CCW from bottom-left; the
+        // matrix scales, tilts and drops it into the hand. v0 is the tile top.
+        _itemQuad[0] = new VertexPositionColorTexture(new Vector3(-0.5f, -0.5f, 0f), Color.White, new Vector2(uv.X, uv.W));
+        _itemQuad[1] = new VertexPositionColorTexture(new Vector3(0.5f, -0.5f, 0f), Color.White, new Vector2(uv.Z, uv.W));
+        _itemQuad[2] = new VertexPositionColorTexture(new Vector3(0.5f, 0.5f, 0f), Color.White, new Vector2(uv.Z, uv.Y));
+        _itemQuad[3] = new VertexPositionColorTexture(new Vector3(-0.5f, 0.5f, 0f), Color.White, new Vector2(uv.X, uv.Y));
+
+        var local = Matrix.CreateScale(0.55f)
+            * Matrix.CreateRotationZ(-0.6f)                       // handle points to lower-right
+            * Matrix.CreateRotationY(0.4f)                        // slight turn for depth
+            * Matrix.CreateRotationX(-SwingAngle * 0.25f)         // dips with the punch swing
+            * Matrix.CreateTranslation(0.5f, -0.5f + bob, -0.9f); // into the fist
+        _effect.World = local * Matrix.Invert(camera.View);
+
+        // Sprite has a transparent background; blend it and don't cull the back.
+        _device.BlendState = BlendState.AlphaBlend;
+        _device.RasterizerState = RasterizerState.CullNone;
+        foreach (var pass in _effect.CurrentTechnique.Passes)
+        {
+            pass.Apply();
+            _device.DrawUserIndexedPrimitives(PrimitiveType.TriangleList, _itemQuad, 0, 4, ItemQuadIndices, 0, 2);
+        }
+        _device.BlendState = BlendState.Opaque;
+        _device.RasterizerState = RasterizerState.CullCounterClockwise;
     }
 
     private void DrawPart(Part part, Matrix rotation, Matrix body, FirstPersonCamera camera)

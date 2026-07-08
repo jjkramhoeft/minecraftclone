@@ -643,7 +643,7 @@ public class MainGame : Game
             if (_camera.ThirdPerson)
                 _playerModel.DrawBody(_camera, _player.Position, _camera.Yaw, _camera.Pitch);
             else
-                _playerModel.DrawFirstPersonArm(_camera);
+                _playerModel.DrawFirstPersonArm(_camera, _inventory.SelectedStack.Item);
 
             if (showGameplayUi)
                 _hud.Draw(_spriteBatch, _health, width, height);

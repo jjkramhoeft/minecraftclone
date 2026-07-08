@@ -23,6 +23,11 @@ public static class ItemInfo
     public static int MaxStack(ItemType item) =>
         item is ItemType.Bucket or ItemType.WaterBucket || GetToolClass(item) != ToolClass.None ? 1 : 64;
 
+    /// <summary>Items the first-person view shows held as a flat sprite in the
+    /// hand: tools and the bucket. Blocks and loose items stay hand-only.</summary>
+    public static bool IsHeldInHand(ItemType item) =>
+        GetToolClass(item) != ToolClass.None || item is ItemType.Bucket or ItemType.WaterBucket;
+
     public static ToolClass GetToolClass(ItemType item) => item switch
     {
         ItemType.WoodenPickaxe or ItemType.StonePickaxe or ItemType.IronPickaxe => ToolClass.Pickaxe,
