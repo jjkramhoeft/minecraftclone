@@ -153,7 +153,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `ChestScreen.cs` | Chest overlay: the chest's 12 slots above the player inventory, same click model |
 | `SlotRenderer.cs` | Shared slot drawing (frame, item icon, stack count) |
 | `MenuScreen.cs` | Main menu (three world slots with save/delete) and the in-game pause menu (resume/save/quit to menu) |
-| `DebugOverlay.cs` | `F3` panel: FPS, position/mode, chunk counts, camera angles, time of day, vertex count, and a block-frequency snapshot |
+| `DebugOverlay.cs` | `F3` panel: FPS, position/mode, chunk counts, camera angles, time of day, vertex count, and block- and biome-frequency snapshots |
 | `PixelFont.cs` | Tiny procedural bitmap font — the project has no SpriteFont/content pipeline |
 
 ### `Audio\` — synthesized sound

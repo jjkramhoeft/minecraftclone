@@ -72,6 +72,24 @@ public class ChunkManager : IDisposable
         return _chunks.Count;
     }
 
+    /// <summary>Tallies the biome of every column across every loaded chunk into
+    /// <paramref name="counts"/> (indexed by Biome value) and returns the number
+    /// of chunks sampled. Biomes aren't stored, so each column is reclassified
+    /// from the generator — debug-only, invoked once when the F3 overlay opens.</summary>
+    public int CountBiomes(long[] counts)
+    {
+        System.Array.Clear(counts, 0, counts.Length);
+        foreach (var chunk in _chunks.Values)
+        {
+            int baseX = chunk.Coord.X * Chunk.SizeX;
+            int baseZ = chunk.Coord.Z * Chunk.SizeZ;
+            for (int x = 0; x < Chunk.SizeX; x++)
+                for (int z = 0; z < Chunk.SizeZ; z++)
+                    counts[(byte)_generator.GetBiome(baseX + x, baseZ + z)]++;
+        }
+        return _chunks.Count;
+    }
+
     public ChunkManager(GraphicsDevice device, TerrainGenerator generator, WorldSave save)
     {
         _device = device;

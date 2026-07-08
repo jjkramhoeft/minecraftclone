@@ -52,6 +52,7 @@ public class MainGame : Game
     private PixelFont _font;
     private DebugOverlay _debugOverlay;
     private readonly long[] _blockCounts = new long[256]; // scratch for F3 block-frequency
+    private readonly long[] _biomeCounts = new long[16];   // scratch for F3 biome-frequency
     private GameSounds _sounds;
     private PlayerHealth _health;
     private Furnaces _furnaces;
@@ -328,7 +329,10 @@ public class MainGame : Game
         {
             _debugOverlay.Visible = !_debugOverlay.Visible;
             if (_debugOverlay.Visible)
+            {
                 BuildBlockFrequency();
+                BuildBiomeFrequency();
+            }
             else
                 _debugOverlay.FreqLines.Clear();
         }
@@ -720,6 +724,37 @@ public class MainGame : Game
             var (id, count) = present[i];
             float pct = 100f * count / solid;
             freq.Add($"{(BlockType)id} {pct:0.00}");
+        }
+    }
+
+    /// <summary>Snapshots the per-column biome composition of every loaded chunk
+    /// when F3 opens the overlay, appended beneath the block frequencies.
+    /// Percentages are of all surface columns, sorted descending.</summary>
+    private void BuildBiomeFrequency()
+    {
+        var freq = _debugOverlay.FreqLines;
+        if (_chunkManager == null)
+            return;
+
+        _chunkManager.CountBiomes(_biomeCounts);
+        long columns = 0;
+        for (int i = 0; i < _biomeCounts.Length; i++)
+            columns += _biomeCounts[i];
+
+        freq.Add("BIOME FREQ");
+        if (columns == 0)
+            return;
+
+        var present = new List<(int Id, long Count)>();
+        for (int i = 0; i < _biomeCounts.Length; i++)
+            if (_biomeCounts[i] > 0)
+                present.Add((i, _biomeCounts[i]));
+        present.Sort((a, b) => b.Count.CompareTo(a.Count));
+
+        foreach (var (id, count) in present)
+        {
+            float pct = 100f * count / columns;
+            freq.Add($"{(Biome)id} {pct:0.00}");
         }
     }
 

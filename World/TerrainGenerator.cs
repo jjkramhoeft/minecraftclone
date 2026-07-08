@@ -94,41 +94,13 @@ public class TerrainGenerator
                 int worldX = chunk.Coord.X * Chunk.SizeX + x;
                 int worldZ = chunk.Coord.Z * Chunk.SizeZ + z;
 
-                float biomeValue = _biomeNoise.GetNoise(worldX, worldZ); // [-1, 1]
-                Biome biome =
-                    biomeValue > 0.35f ? Biome.Desert :
-                    biomeValue < -0.55f ? Biome.Mountains :
-                    biomeValue < -0.15f ? Biome.Forest :
-                    Biome.Plains;
-
-                // Deserts (high biomeValue) are flat, forests mountainous.
-                float amplitude = MathHelper.Lerp(24f, 9f, (biomeValue + 1f) * 0.5f);
-                float lift = 0f;
-                if (biome == Biome.Mountains)
-                {
-                    // Ramp 0->1 across the mountain band (-0.55 .. -1) so the
-                    // boost fades in at the forest border with no height cliff.
-                    float t = MathHelper.Clamp((-0.55f - biomeValue) / 0.45f, 0f, 1f);
-                    amplitude += t * MountainAmplitudeBoost;
-                    lift = t * MountainLift;
-                }
-
-                // Lake basins depress the land in a smooth bowl (0 at the rim to
-                // MaxLakeDepth at the center), independent of the land biome.
-                float lakeFactor = SmoothStep01(0.25f, 0.55f, _lakeNoise.GetNoise(worldX, worldZ));
-
-                float noise = _heightNoise.GetNoise(worldX, worldZ); // [-1, 1]
-                int height = (int)MathHelper.Clamp(
-                    BaseHeight + lift + noise * amplitude - lakeFactor * MaxLakeDepth, 1, Chunk.SizeY - 1);
+                ClassifyColumn(worldX, worldZ, out int height, out Biome biome);
                 heights[x + z * Chunk.SizeX] = height;
+                biomes[x + z * Chunk.SizeX] = (byte)biome;
 
                 // Bare rocky summits above the treeline, snow at the very top.
+                // Lake columns sit below the water line, so they never read rocky.
                 bool rocky = biome == Biome.Mountains && height >= RockLine;
-                // A depressed column that ended up under water is lake bed; the
-                // shore ring keeps its land biome so vegetation transitions.
-                if (lakeFactor > 0.25f && height < WaterLevel)
-                    biome = Biome.Lake;
-                biomes[x + z * Chunk.SizeX] = (byte)biome;
                 bool sandy = height <= SandLevel || biome == Biome.Desert;
 
                 for (int y = 0; y <= height; y++)
@@ -154,6 +126,52 @@ public class TerrainGenerator
         PlantTrees(chunk, heights, biomes);
         ScatterFlowers(chunk, heights, biomes);
         GrowReeds(chunk, heights);
+    }
+
+    /// <summary>The biome a world column ends up in — the same classification the
+    /// generator uses, exposed for the F3 biome-frequency readout.</summary>
+    public Biome GetBiome(int worldX, int worldZ)
+    {
+        ClassifyColumn(worldX, worldZ, out _, out var biome);
+        return biome;
+    }
+
+    /// <summary>Derives a column's surface height and biome from the noise fields.
+    /// The single source of truth for both — Generate and GetBiome share it, so
+    /// the debug readout can never drift from what was actually placed.</summary>
+    private void ClassifyColumn(int worldX, int worldZ, out int height, out Biome biome)
+    {
+        float biomeValue = _biomeNoise.GetNoise(worldX, worldZ); // [-1, 1]
+        biome =
+            biomeValue > 0.35f ? Biome.Desert :
+            biomeValue < -0.55f ? Biome.Mountains :
+            biomeValue < -0.15f ? Biome.Forest :
+            Biome.Plains;
+
+        // Deserts (high biomeValue) are flat, forests mountainous.
+        float amplitude = MathHelper.Lerp(24f, 9f, (biomeValue + 1f) * 0.5f);
+        float lift = 0f;
+        if (biome == Biome.Mountains)
+        {
+            // Ramp 0->1 across the mountain band (-0.55 .. -1) so the boost
+            // fades in at the forest border with no height cliff.
+            float t = MathHelper.Clamp((-0.55f - biomeValue) / 0.45f, 0f, 1f);
+            amplitude += t * MountainAmplitudeBoost;
+            lift = t * MountainLift;
+        }
+
+        // Lake basins depress the land in a smooth bowl (0 at the rim to
+        // MaxLakeDepth at the center), independent of the land biome.
+        float lakeFactor = SmoothStep01(0.25f, 0.55f, _lakeNoise.GetNoise(worldX, worldZ));
+
+        float noise = _heightNoise.GetNoise(worldX, worldZ); // [-1, 1]
+        height = (int)MathHelper.Clamp(
+            BaseHeight + lift + noise * amplitude - lakeFactor * MaxLakeDepth, 1, Chunk.SizeY - 1);
+
+        // A depressed column that ended up under water is lake bed; the shore
+        // ring keeps its land biome so vegetation transitions.
+        if (lakeFactor > 0.25f && height < WaterLevel)
+            biome = Biome.Lake;
     }
 
     /// <summary>1 tree per ~N eligible columns; 0 = no trees in this biome.</summary>
