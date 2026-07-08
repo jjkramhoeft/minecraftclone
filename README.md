@@ -33,8 +33,8 @@ Mouse and keyboard only.
 | `W A S D` | Move |
 | Mouse | Look around |
 | `Space` | Jump / swim up (fly up in fly mode) |
-| `Left Shift` | Fly down (fly mode) |
 | `Left Ctrl` | Sprint |
+| `Left Shift` | Do not fall down mode (Fly down in fly mode) |
 | Left click (hold) | Mine block — speed depends on block hardness and the held tool |
 | Right click | Place block |
 | `1`–`6` / scroll wheel | Select hotbar slot |
@@ -42,7 +42,6 @@ Mouse and keyboard only.
 | `V` | Toggle first/third-person camera |
 | `F` | Toggle fly mode |
 | `F5` | Save world |
-| `N` | Restart with a new random seed (⚠ deletes the current world and inventory) |
 | `Esc` | Quit |
 
 ## Build & run
@@ -141,7 +140,6 @@ The choices that shape the code, written down so future-me doesn't relitigate th
 - **Block edits remesh synchronously** on the main thread (a chunk meshes in well under 2 ms) so breaking/placing feels instant.
 - **Textures are generated in code** at startup — a 256×256 atlas of 16×16 tiles with per-tile color + noise speckle. No art assets, and no MonoGame content pipeline (MGCB) involvement.
 - **Only player-modified chunks are saved.** Everything else regenerates deterministically from the world seed.
-- **Water is still**: it renders semi-transparent in a second pass and you swim in it, but there is no flow simulation — breaking a block under water leaves air.
 
 ## Save format
 
@@ -150,15 +148,14 @@ Saves live in `saves\default\` relative to the working directory (next to the ex
 - `world.json` — seed, format version, player position/rotation, selected hotbar slot, fly mode, inventory, time of day
 - `chunks\c_{x}_{z}.bin` — one file per *modified* chunk: small header (magic, version, chunk coordinate) followed by the raw 32 KB block array behind a `GZipStream` (~1-3 KB on disk)
 
-Saving happens automatically when chunks unload and when the game exits; `F5` forces a full save. Press `N` in-game (or delete the `saves` folder) for a fresh world with a new random seed — this erases the current world and inventory.
+Saving happens automatically when chunks unload and when the game exits; `F5` forces a full save.
 
 ## Non-goals
 
 Written down so scope creep has to argue with a document:
 
-- No mobs, NPCs, or other creatures
+- No mobs
 - No multiplayer
-- No crafting, inventory management, or survival mechanics (this is creative-mode building)
 - No gamepad — mouse and keyboard only
 
 ## Credits

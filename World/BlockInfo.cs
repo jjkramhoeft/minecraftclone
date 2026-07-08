@@ -87,6 +87,7 @@ public static class BlockInfo
     public const int TilePineBark = 55;
     public const int TilePineTop = 56;
     public const int TilePineLeaves = 57;
+    public const int TileFern = 58;
 
     /// <summary>Solid blocks collide and cast ambient occlusion. Plants are
     /// deliberately NOT solid — you walk through them.</summary>
@@ -125,7 +126,7 @@ public static class BlockInfo
     /// instantly, and need a supporting block below. Torches behave the same
     /// way except they stand on any solid block.</summary>
     public static bool IsPlant(BlockType type) =>
-        IsFlower(type) || type is BlockType.Reeds or BlockType.Torch;
+        IsFlower(type) || type is BlockType.Reeds or BlockType.Torch or BlockType.Fern;
 
     /// <summary>What a plant may stand on. Reeds also stack on themselves.</summary>
     public static bool CanSupportPlant(BlockType plant, BlockType below) => plant switch
@@ -171,6 +172,7 @@ public static class BlockInfo
         BlockType.FlowerYellow => TileFlowerYellow,
         BlockType.FlowerPoppy => TileFlowerPoppy,
         BlockType.Reeds => TileReeds,
+        BlockType.Fern => TileFern,
         BlockType.CoalOre => TileCoalOre,
         BlockType.IronOre => TileIronOre,
         BlockType.Torch => TileTorch,

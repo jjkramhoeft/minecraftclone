@@ -44,4 +44,7 @@ public enum BlockType : byte
     BirchLeaves = 31,
     PineLog = 32,
     PineLeaves = 33,
+    // Ground cover near pines. A plant (cross-quad, breaks instantly), not an
+    // item — it drops nothing, so like the tree variants it needs no ItemType.
+    Fern = 34,
 }

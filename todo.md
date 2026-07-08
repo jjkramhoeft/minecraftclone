@@ -8,11 +8,11 @@ Minecraft itself as the reference.
 
 ## Main outstanding 
 
-- [ ] Under water visuals. from above the water looks fine, but when swimming under 
+- [X] Under water visuals. from above the water looks fine, but when swimming under 
       the water there is no visual indication of the water. Solution tint all blue when under water.      
-- [ ] More Tree types: Birch & Pine. for a start just place then as normal trees but with a
+- [X] More Tree types: Birch & Pine. for a start just place then as normal trees but with a
       lower frequency (birch as 5% of trees and pine as 10% of trees). Birch should have slightly lighter green leaves and whitish trunks and same sape as normal trees. Pine should have slightly darker green leaves(needles) and a cone shape
-- [ ] More plants/flowers: Add a fern plant. it can spawn under/close to pine trees   
+- [-] More plants/flowers: Add a fern plant. it can spawn under/close to pine trees   
 - [ ] More Blocks: Add a Cobblestone block. It is not spawn by the normal world generator, but
       instead when stone is placed it is placed as cobblestone, and if cobblestone is mined it is collected as stone. 
 
@@ -24,3 +24,6 @@ Minecraft itself as the reference.
 - [ ] Add 'blob' caves
 - [ ] Enemies
 - [ ] Player skins
+- [ ] Hold active tool in hand. Visual improvement
+- [ ] Only show available recipies (if not CraftingTable do not show recipies from crafting table)
+- [ ] Stars should not be visible through the clouds

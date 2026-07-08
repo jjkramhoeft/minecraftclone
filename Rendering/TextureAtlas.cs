@@ -82,6 +82,7 @@ public class TextureAtlas
         DrawBark(pixels, BlockInfo.TilePineBark, new Color(84, 58, 38));
         DrawLogTop(pixels, BlockInfo.TilePineTop, new Color(120, 88, 58), new Color(92, 66, 42));
         DrawLeavesTile(pixels, BlockInfo.TilePineLeaves, new Color(40, 96, 48), new Color(24, 66, 32));
+        DrawFern(pixels);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -420,6 +421,43 @@ public class TextureAtlas
                 if (Math.Abs(dx) + Math.Abs(dy) <= 2)
                     SetPixel(pixels, tile, 7 + dx, 3 + dy, petal);
         SetPixel(pixels, tile, 7, 3, center);
+    }
+
+    /// <summary>Fern for the cross-quad cutout mesh: a fan of arching fronds
+    /// with leaflet nubs, on a transparent background (binary alpha).</summary>
+    private static void DrawFern(Color[] pixels)
+    {
+        int tile = BlockInfo.TileFern;
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Color.Transparent);
+
+        var rng = RngFor(tile);
+        var frond = new Color(74, 128, 52);
+        var tip = new Color(108, 158, 78);
+
+        // Each frond rises from the base tuft (x=8, y=15) and leans out to its
+        // tip offset, with short leaflets along the spine.
+        Span<int> spread = stackalloc int[] { -4, -2, 0, 2, 4 };
+        const int steps = 11;
+        foreach (int dxTip in spread)
+        {
+            for (int i = 0; i < steps; i++)
+            {
+                float t = i / (float)(steps - 1);
+                int x = 8 + (int)MathF.Round(dxTip * t);
+                int y = 15 - i;
+                if (x < 0 || x >= TileSize || y < 0)
+                    continue;
+                SetPixel(pixels, tile, x, y, Jitter(rng, i >= steps - 3 ? tip : frond, 8));
+                if (i % 2 == 0)
+                {
+                    int lx = x + (dxTip < 0 ? -1 : dxTip > 0 ? 1 : (i % 4 == 0 ? 1 : -1));
+                    if (lx >= 0 && lx < TileSize)
+                        SetPixel(pixels, tile, lx, y, Jitter(rng, frond, 8));
+                }
+            }
+        }
     }
 
     /// <summary>Breaking-progress overlay: dark crack strands random-walking out

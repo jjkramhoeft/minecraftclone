@@ -283,7 +283,10 @@ public class TerrainGenerator
                     : TreeSpecies.Oak;
 
                 if (species == TreeSpecies.Pine)
+                {
                     PlantPine(chunk, x, z, surface, trunkHeight: 6 + (hash / spacing) % 3); // 6-8
+                    ScatterFerns(chunk, heights, x, z);
+                }
                 else
                     PlantBroadleaf(chunk, x, z, surface, trunkHeight: 4 + (hash / spacing) % 3, // 4-6
                         log: species == TreeSpecies.Birch ? BlockType.BirchLog : BlockType.Wood,
@@ -349,6 +352,34 @@ public class TerrainGenerator
 
         for (int y = surface + 1; y <= topY; y++)
             chunk.SetBlock(x, y, z, BlockType.PineLog);
+    }
+
+    /// <summary>Ferns as pine-forest ground cover: 2-4 on grass columns within
+    /// radius 2 of the trunk (that reach keeps them inside the planted column's
+    /// border, so no bounds surprises). Deterministic and allocation-free.</summary>
+    private void ScatterFerns(Chunk chunk, ReadOnlySpan<int> heights, int x, int z)
+    {
+        int worldX = chunk.Coord.X * Chunk.SizeX + x;
+        int worldZ = chunk.Coord.Z * Chunk.SizeZ + z;
+        int seed = Hash(worldX, worldZ, Seed ^ 0x3C2B1A09);
+        int count = 2 + seed % 3; // 2-4
+        for (int i = 0; i < count; i++)
+        {
+            seed = Hash(seed, i, Seed ^ 0x77CC33AB);
+            int dx = seed % 5 - 2;         // -2..2
+            int dz = seed / 5 % 5 - 2;     // -2..2
+            if (dx == 0 && dz == 0)
+                continue; // the trunk column
+            int nx = x + dx, nz = z + dz;
+            if (nx < 0 || nx >= Chunk.SizeX || nz < 0 || nz >= Chunk.SizeZ)
+                continue;
+            int surface = heights[nx + nz * Chunk.SizeX];
+            if (surface + 1 >= Chunk.SizeY
+                || chunk.GetBlock(nx, surface, nz) != BlockType.Grass
+                || chunk.GetBlock(nx, surface + 1, nz) != BlockType.Air)
+                continue;
+            chunk.SetBlock(nx, surface + 1, nz, BlockType.Fern);
+        }
     }
 
     private static void SetIfAir(Chunk chunk, int x, int y, int z, BlockType type)
