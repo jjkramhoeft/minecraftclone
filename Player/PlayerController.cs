@@ -14,6 +14,11 @@ public class PlayerController
 {
     private const float WalkSpeed = 4.5f;
     private const float SprintMultiplier = 1.6f;
+    private const float SneakMultiplier = 0.35f;
+    // How far below the feet the sneak ledge probe looks for ground. Larger
+    // than the physics Skin gap, small enough not to see the block below a slab-
+    // height drop as "still supported".
+    private const float LedgeProbeDepth = 0.1f;
     private const float FlySpeed = 12f;
     private const float FlyVerticalSpeed = 10f;
     private const float JumpVelocity = 8.5f;
@@ -35,7 +40,11 @@ public class PlayerController
     public bool IsFlying { get; private set; }
     public bool IsOnGround { get; private set; }
 
-    public Vector3 EyePosition => Position + new Vector3(0f, EyeHeight, 0f);
+    /// <summary>LeftShift while walking: slower, lowered eye, and the ledge
+    /// probe keeps the feet from leaving the block they stand on.</summary>
+    public bool IsSneaking { get; private set; }
+
+    public Vector3 EyePosition => Position + new Vector3(0f, IsSneaking ? EyeHeight - 0.12f : EyeHeight, 0f);
 
     /// <summary>Downward speed at the moment of the latest landing, 0 while
     /// airborne or after a soft touchdown — read by fall damage.</summary>
@@ -70,13 +79,16 @@ public class PlayerController
 
         if (IsFlying)
         {
+            IsSneaking = false;
             Velocity = wish * FlySpeed;
             if (keyboard.IsKeyDown(Keys.Space)) Velocity.Y = FlyVerticalSpeed;
             else if (keyboard.IsKeyDown(Keys.LeftShift)) Velocity.Y = -FlyVerticalSpeed;
         }
         else
         {
-            float speed = WalkSpeed * (keyboard.IsKeyDown(Keys.LeftControl) ? SprintMultiplier : 1f);
+            IsSneaking = keyboard.IsKeyDown(Keys.LeftShift);
+            float speed = WalkSpeed * (IsSneaking ? SneakMultiplier
+                : keyboard.IsKeyDown(Keys.LeftControl) ? SprintMultiplier : 1f);
             bool inWater = BlockInfo.IsWater(world.GetBlock(
                 (int)MathF.Floor(Position.X),
                 (int)MathF.Floor(Position.Y + 0.6f),
@@ -98,6 +110,17 @@ public class PlayerController
                 Velocity.Y = MathF.Max(Velocity.Y + Gravity * dt, TerminalVelocity);
                 if (IsOnGround && keyboard.IsKeyDown(Keys.Space))
                     Velocity.Y = JumpVelocity;
+
+                // Edge-stop: sneaking on the ground, each horizontal axis is
+                // cancelled independently if this frame's move would carry the
+                // feet past the ledge — sliding along the edge still works.
+                if (IsSneaking && IsOnGround)
+                {
+                    if (Velocity.X != 0f && !HasGroundBeneath(world, Position + new Vector3(Velocity.X * dt, 0f, 0f)))
+                        Velocity.X = 0f;
+                    if (Velocity.Z != 0f && !HasGroundBeneath(world, Position + new Vector3(Velocity.X * dt, 0f, Velocity.Z * dt)))
+                        Velocity.Z = 0f;
+                }
             }
         }
 
@@ -105,6 +128,22 @@ public class PlayerController
         float fallSpeed = -Velocity.Y;
         IsOnGround = PlayerPhysics.MoveWithCollision(ref Position, ref Velocity, world, dt, out _againstWall);
         LandingImpact = !wasOnGround && IsOnGround && fallSpeed > 0f ? fallSpeed : 0f;
+    }
+
+    /// <summary>True when any solid block sits under the AABB footprint at
+    /// the given position, just below the feet.</summary>
+    private static bool HasGroundBeneath(ChunkManager world, Vector3 position)
+    {
+        int y = (int)MathF.Floor(position.Y - LedgeProbeDepth);
+        int x0 = (int)MathF.Floor(position.X - PlayerPhysics.HalfWidth);
+        int x1 = (int)MathF.Floor(position.X + PlayerPhysics.HalfWidth - 1e-5f);
+        int z0 = (int)MathF.Floor(position.Z - PlayerPhysics.HalfWidth);
+        int z1 = (int)MathF.Floor(position.Z + PlayerPhysics.HalfWidth - 1e-5f);
+        for (int z = z0; z <= z1; z++)
+            for (int x = x0; x <= x1; x++)
+                if (BlockInfo.IsSolid(world.GetBlock(x, y, z)))
+                    return true;
+        return false;
     }
 
     /// <summary>Respawn/teleport: moves the feet and kills all momentum.</summary>

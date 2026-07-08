@@ -8,11 +8,11 @@ Minecraft itself as the reference.
 
 ## Medium — systems and UX
 
-- [ ] **Item drops as world entities.** Broken blocks currently teleport into the
+- [x] **Item drops as world entities.** Broken blocks currently teleport into the
       inventory (and are *lost* when it's full — see `BlockInteraction.BreakBlock`).
       Spawn a small bobbing cube entity with pickup radius instead, reusing the
       `FallingBlocks` entry pattern.
-- [ ] **Sneak.** LeftShift while grounded: slower speed + edge-stop (don't walk off
+- [x] **Sneak.** LeftShift while grounded: slower speed + edge-stop (don't walk off
       the block you're standing on). Small change in `Player/PlayerController.cs` +
       an extra ledge probe in `PlayerPhysics`; makes building over voids viable.
 - [ ] **Clouds.** Craft has them and they're cheap: a flat translucent quad layer at
