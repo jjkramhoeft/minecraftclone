@@ -48,7 +48,7 @@ Minecraft itself as the reference.
 
 ## Medium — systems and UX
 
-- [ ] **Menus + world slots.** No main menu, pause menu, or world list; `N` silently
+- [x] **Menus + world slots.** No main menu, pause menu, or world list; `N` silently
       deletes the world. `Persistence/WorldSave.cs` already takes a `worldName` — a
       world-select screen and an Esc pause menu (resume/save/quit) close the roughest
       UX edge. Requires letters in `UI/PixelFont.cs` (currently digits + 'x' only) —

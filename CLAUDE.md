@@ -18,7 +18,7 @@ Folders mirror namespaces:
 ```
 dotnet tool restore                      # once per clone (MGCB tools)
 dotnet build MinecraftClone.csproj       # compile
-dotnet run                               # play (loads/saves saves/default/)
+dotnet run                               # play (main menu with 3 world slots; slot 1 = saves/default/)
 dotnet run -- --smoke                    # smoke test: ~3 s throwaway world, prints summary, exits
 ```
 
@@ -33,7 +33,7 @@ Textures are generated in code — the MGCB content pipeline (`Content/Content.m
 
 ## Gotchas
 
-- World saves live in `saves/default/` relative to the working directory, so there's one under the repo root and one under `bin/Debug/net9.0/`. Never modify or delete them; smoke mode deliberately uses a separate `saves/smoke/` world and skips saving.
+- World saves live in `saves/{default,world2,world3}/` relative to the working directory, so they exist both under the repo root and under `bin/Debug/net9.0/`. Never modify or delete them; smoke mode deliberately uses a separate `saves/smoke/` world and skips saving.
 - `README.md`'s "Non-goals" section is partly stale: crafting, inventory, and flowing water are now implemented.
 - Keep `Update`/`Draw` paths allocation-free — per-frame garbage causes GC hitches in MonoGame.
-- The game exits via Escape and autosaves in `OnExiting`; smoke mode skips that autosave.
+- Escape opens the pause menu (resume/save/quit to menu); the game exits via the menu or window close and autosaves in `OnExiting` when a world is loaded. Smoke mode skips that autosave.

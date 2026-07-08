@@ -17,6 +17,9 @@ public class MainGame : Game
 {
     private const int DefaultSeed = 12345;
 
+    // Slot 0 keeps the historical "default" directory so old saves survive.
+    private static readonly string[] WorldSlotNames = { "default", "world2", "world3" };
+
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
     private FirstPersonCamera _camera;
@@ -39,6 +42,7 @@ public class MainGame : Game
     private Hotbar _hotbar;
     private Inventory _inventory;
     private InventoryScreen _inventoryScreen;
+    private MenuScreen _menu;
     private PixelFont _font;
     private GameSounds _sounds;
     private PlayerHealth _health;
@@ -50,6 +54,10 @@ public class MainGame : Game
 
     private WorldSave _worldSave;
     private int _seed;
+
+    /// <summary>False while sitting in the main menu with no world loaded —
+    /// world objects (_chunkManager, _player, ...) must not be touched then.</summary>
+    private bool _worldActive;
 
     private MouseState _previousMouse;
     private KeyboardState _previousKeyboard;
@@ -83,11 +91,29 @@ public class MainGame : Game
 
     protected override void Initialize()
     {
-        _worldSave = new WorldSave(_smoke ? "smoke" : "default");
-        var meta = _smoke ? null : _worldSave.TryLoadMetadata();
-        _seed = meta?.Seed ?? DefaultSeed;
+        _inventory = new Inventory();
+        _camera = new FirstPersonCamera();
+        _camera.UpdateProjection(GraphicsDevice.Viewport.AspectRatio);
+        _dayNight = new DayNightCycle();
 
-        _inventory = new Inventory { SelectedIndex = meta?.HotbarIndex ?? 0 };
+        base.Initialize(); // runs LoadContent
+
+        if (_smoke)
+            StartWorld("smoke");
+        else
+            OpenMainMenu();
+    }
+
+    /// <summary>Loads (or creates) a world into the existing object graph:
+    /// long-lived UI/renderers stay, world-scoped state is rebuilt in place.</summary>
+    private void StartWorld(string name)
+    {
+        _worldSave = new WorldSave(name);
+        var meta = _smoke ? null : _worldSave.TryLoadMetadata();
+        _seed = meta?.Seed ?? (_smoke ? DefaultSeed : Random.Shared.Next());
+
+        _inventory.Clear();
+        _inventory.SelectedIndex = meta?.HotbarIndex ?? 0;
         if (meta?.Inventory != null)
         {
             foreach (var slot in meta.Inventory)
@@ -95,9 +121,9 @@ public class MainGame : Game
                     _inventory[slot.Slot] = new ItemStack((ItemType)slot.Item, slot.Count);
         }
 
-        _camera = new FirstPersonCamera { Yaw = meta?.Yaw ?? 0f, Pitch = meta?.Pitch ?? 0f };
-        _camera.UpdateProjection(GraphicsDevice.Viewport.AspectRatio);
-        _dayNight = new DayNightCycle { TimeOfDay = meta?.TimeOfDay ?? 0.1f };
+        _camera.Yaw = meta?.Yaw ?? 0f;
+        _camera.Pitch = meta?.Pitch ?? 0f;
+        _dayNight.TimeOfDay = meta?.TimeOfDay ?? 0.1f;
 
         // Fresh world: spawn above the highest possible terrain; the player
         // falls to the ground once the spawn chunk has loaded.
@@ -105,7 +131,57 @@ public class MainGame : Game
             ? new PlayerController(new Vector3(meta.PlayerX, meta.PlayerY, meta.PlayerZ), meta.IsFlying)
             : new PlayerController(new Vector3(8.5f, 70f, 8.5f));
 
-        base.Initialize();
+        _chunkManager?.Dispose();
+        _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
+        _blockUpdater = new BlockUpdater();
+        _fallingBlocks.Clear();
+        _mobs.Clear();
+        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
+        WireInteractionEvents();
+        _health.Reset();
+        _wasInWater = false;
+        _stepDistance = 0f;
+        _lastStepPosition = _player.Position;
+
+        _worldActive = true;
+        _menu.Current = MenuScreen.Mode.Hidden;
+        IsMouseVisible = false;
+        _mouseCaptured = false;
+
+        if (meta == null && !_smoke)
+            SaveWorld(); // pin the new seed to disk immediately
+    }
+
+    private void OpenMainMenu()
+    {
+        for (int i = 0; i < MenuScreen.WorldSlots; i++)
+            _menu.SlotSaved[i] = WorldSave.Exists(WorldSlotNames[i]);
+        _menu.Current = MenuScreen.Mode.Main;
+        IsMouseVisible = true;
+        _mouseCaptured = false;
+    }
+
+    private void OpenPauseMenu()
+    {
+        _menu.Current = MenuScreen.Mode.Pause;
+        IsMouseVisible = true;
+        _mouseCaptured = false;
+    }
+
+    private void ResumeGame()
+    {
+        _menu.Current = MenuScreen.Mode.Hidden;
+        IsMouseVisible = false;
+        _mouseCaptured = false;
+    }
+
+    private void QuitToMenu()
+    {
+        _fallingBlocks.SettleAll(_chunkManager, _blockUpdater);
+        SaveWorld();
+        _worldActive = false;
+        _chunkManager.Dispose();
+        OpenMainMenu();
     }
 
     protected override void LoadContent()
@@ -113,25 +189,33 @@ public class MainGame : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _atlas = new TextureAtlas(GraphicsDevice);
         _worldRenderer = new WorldRenderer(GraphicsDevice, _atlas);
-        _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
         _blockHighlight = new BlockHighlight(GraphicsDevice);
         _breakingOverlay = new BreakingOverlay(GraphicsDevice, _atlas);
-        _blockUpdater = new BlockUpdater();
         _fallingBlocks = new FallingBlocks();
         _fallingBlockRenderer = new FallingBlockRenderer(GraphicsDevice, _atlas);
         _mobs = new Mobs();
         _mobRenderer = new MobRenderer(GraphicsDevice, _atlas);
         _skyRenderer = new SkyRenderer(GraphicsDevice, _atlas);
-        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
         _sounds = new GameSounds();
-        WireInteractionEvents();
         _health = new PlayerHealth();
         _health.Died += RespawnPlayer;
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
         _inventoryScreen = new InventoryScreen(GraphicsDevice, _inventory);
+
+        _menu = new MenuScreen(GraphicsDevice);
+        _menu.WorldChosen += slot => StartWorld(WorldSlotNames[slot]);
+        _menu.WorldDeleted += slot =>
+        {
+            new WorldSave(WorldSlotNames[slot]).DeleteAll();
+            _menu.SlotSaved[slot] = false;
+        };
+        _menu.ResumeRequested += ResumeGame;
+        _menu.SaveRequested += SaveWorld;
+        _menu.QuitToMenuRequested += QuitToMenu;
+        _menu.ExitRequested += Exit;
     }
 
     protected override void Update(GameTime gameTime)
@@ -139,12 +223,30 @@ public class MainGame : Game
         var keyboard = Keyboard.GetState();
         var mouse = Mouse.GetState();
 
+        // Menu (main or pause) suspends the world entirely.
+        if (_menu.Current != MenuScreen.Mode.Hidden)
+        {
+            if (keyboard.IsKeyDown(Keys.Escape) && _previousKeyboard.IsKeyUp(Keys.Escape))
+            {
+                if (_menu.Current == MenuScreen.Mode.Pause)
+                    ResumeGame();
+                else
+                    Exit();
+            }
+            if (IsActive)
+                _menu.Update(mouse, _previousMouse, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+            _previousKeyboard = keyboard;
+            _previousMouse = mouse;
+            base.Update(gameTime);
+            return;
+        }
+
         if (keyboard.IsKeyDown(Keys.Escape) && _previousKeyboard.IsKeyUp(Keys.Escape))
         {
             if (_inventoryScreen.IsOpen)
                 ToggleInventoryScreen();
             else
-                Exit();
+                OpenPauseMenu();
         }
 
         if (keyboard.IsKeyDown(Keys.E) && _previousKeyboard.IsKeyUp(Keys.E))
@@ -152,9 +254,6 @@ public class MainGame : Game
 
         if (keyboard.IsKeyDown(Keys.V) && _previousKeyboard.IsKeyUp(Keys.V))
             _camera.ThirdPerson = !_camera.ThirdPerson;
-
-        if (!_inventoryScreen.IsOpen && keyboard.IsKeyDown(Keys.N) && _previousKeyboard.IsKeyUp(Keys.N))
-            RestartWorld();
 
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         if (_inventoryScreen.IsOpen)
@@ -194,34 +293,6 @@ public class MainGame : Game
         }
 
         base.Update(gameTime);
-    }
-
-    /// <summary>Abandons the current world (deleting its save) and starts a
-    /// fresh one with a random seed: new terrain, empty inventory, respawn.</summary>
-    private void RestartWorld()
-    {
-        _seed = Random.Shared.Next();
-        _worldSave.DeleteAll();
-
-        // Everything that referenced the old world is rebuilt; the old chunk
-        // manager's in-flight workers finish into discarded queues.
-        _chunkManager.Dispose();
-        _chunkManager = new ChunkManager(GraphicsDevice, new TerrainGenerator(_seed), _worldSave);
-        _blockUpdater = new BlockUpdater();
-        _fallingBlocks.Clear();
-        _mobs.Clear();
-        _player = new PlayerController(new Vector3(8.5f, 70f, 8.5f));
-        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
-        WireInteractionEvents();
-
-        // Hotbar and InventoryScreen hold the inventory reference — clear in place.
-        _inventory.Clear();
-        _health.Reset();
-        _camera.Yaw = 0f;
-        _camera.Pitch = 0f;
-        _dayNight.TimeOfDay = 0.1f;
-
-        SaveWorld(); // pin the new seed to disk immediately
     }
 
     /// <summary>Death is gentle for now: back to the world spawn with full
@@ -329,8 +400,11 @@ public class MainGame : Game
         }
 
         // Land anything mid-air so no block is lost between sessions.
-        _fallingBlocks.SettleAll(_chunkManager, _blockUpdater);
-        SaveWorld();
+        if (_worldActive)
+        {
+            _fallingBlocks.SettleAll(_chunkManager, _blockUpdater);
+            SaveWorld();
+        }
         base.OnExiting(sender, args);
     }
 
@@ -369,41 +443,48 @@ public class MainGame : Game
 
         int width = GraphicsDevice.Viewport.Width, height = GraphicsDevice.Viewport.Height;
 
-        _skyRenderer.Draw(GraphicsDevice, _camera, _dayNight);
-        _worldRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
-        _playerModel.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
-        _fallingBlockRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
-        _mobRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
-
-        _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
-        _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);
-        _mobRenderer.Draw(_camera, _mobs.All);
-        if (!_inventoryScreen.IsOpen)
+        if (_worldActive)
         {
-            if (_blockInteraction.IsMining)
+            _skyRenderer.Draw(GraphicsDevice, _camera, _dayNight);
+            _worldRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
+            _playerModel.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
+            _fallingBlockRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
+            _mobRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
+
+            _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
+            _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);
+            _mobRenderer.Draw(_camera, _mobs.All);
+            bool showGameplayUi = !_inventoryScreen.IsOpen && _menu.Current == MenuScreen.Mode.Hidden;
+            if (showGameplayUi)
             {
-                var pos = _blockInteraction.MiningPos;
-                _breakingOverlay.Draw(GraphicsDevice, _camera, pos, _blockInteraction.BreakProgress);
+                if (_blockInteraction.IsMining)
+                {
+                    var pos = _blockInteraction.MiningPos;
+                    _breakingOverlay.Draw(GraphicsDevice, _camera, pos, _blockInteraction.BreakProgress);
+                }
+                if (_blockInteraction.Target is { } target)
+                    _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
             }
-            if (_blockInteraction.Target is { } target)
-                _blockHighlight.Draw(GraphicsDevice, _camera, target.X, target.Y, target.Z);
+
+            if (_camera.ThirdPerson)
+                _playerModel.DrawBody(_camera, _player.Position, _camera.Yaw, _camera.Pitch);
+            else
+                _playerModel.DrawFirstPersonArm(_camera);
+
+            if (showGameplayUi)
+                _hud.Draw(_spriteBatch, _health, width, height);
+            _hotbar.Draw(_spriteBatch, _atlas, _font, width, height);
+            if (_inventoryScreen.IsOpen)
+                _inventoryScreen.Draw(_spriteBatch, _atlas, _font, Mouse.GetState(), width, height);
+
+            UpdateDebugTitle(gameTime);
         }
 
-        if (_camera.ThirdPerson)
-            _playerModel.DrawBody(_camera, _player.Position, _camera.Yaw, _camera.Pitch);
-        else
-            _playerModel.DrawFirstPersonArm(_camera);
-
-        if (!_inventoryScreen.IsOpen)
-            _hud.Draw(_spriteBatch, _health, width, height);
-        _hotbar.Draw(_spriteBatch, _atlas, _font, width, height);
-        if (_inventoryScreen.IsOpen)
-            _inventoryScreen.Draw(_spriteBatch, _atlas, _font, Mouse.GetState(), width, height);
+        _menu.Draw(_spriteBatch, _font, Mouse.GetState(), width, height);
 
         if (_smoke)
             _smokeDraws++;
 
-        UpdateDebugTitle(gameTime);
         base.Draw(gameTime);
     }
 
@@ -423,7 +504,7 @@ public class MainGame : Game
 
     protected override void UnloadContent()
     {
-        _chunkManager.Dispose();
+        _chunkManager?.Dispose();
         base.UnloadContent();
     }
 }

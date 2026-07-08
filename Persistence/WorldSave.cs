@@ -63,6 +63,11 @@ public class WorldSave
 
     private string ChunkPath(ChunkCoord coord) => Path.Combine(_chunksDir, $"c_{coord.X}_{coord.Z}.bin");
 
+    /// <summary>Whether a world slot has been played (metadata on disk) —
+    /// without creating its directories the way the constructor does.</summary>
+    public static bool Exists(string worldName) =>
+        File.Exists(Path.Combine("saves", worldName, "world.json"));
+
     /// <summary>Fills the chunk's blocks from disk. False = no (valid) save file; caller generates instead.</summary>
     public bool TryLoadChunk(Chunk chunk)
     {
