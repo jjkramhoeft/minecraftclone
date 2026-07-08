@@ -63,6 +63,13 @@ public class Hud
         int heartsY = screenHeight - SlotRenderer.SlotSize - 12 - _heart.Height * SpriteScale - 6;
 
         spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+
+        // Submerged: a translucent blue wash over the whole scene, so being
+        // underwater reads clearly from the first-person view (the water
+        // surface itself is invisible looking up through it).
+        if (health.IsUnderwater)
+            spriteBatch.Draw(_pixel, new Rectangle(0, 0, screenWidth, screenHeight), new Color(30, 80, 150, 110));
+
         spriteBatch.Draw(_pixel, new Rectangle(cx - 8, cy - 1, 16, 2), crosshair);
         spriteBatch.Draw(_pixel, new Rectangle(cx - 1, cy - 8, 2, 16), crosshair);
 
