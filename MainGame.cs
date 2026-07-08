@@ -30,6 +30,8 @@ public class MainGame : Game
     private FallingBlockRenderer _fallingBlockRenderer;
     private Mobs _mobs;
     private MobRenderer _mobRenderer;
+    private ItemDrops _itemDrops;
+    private ItemDropRenderer _itemDropRenderer;
     private DayNightCycle _dayNight;
     private SkyRenderer _skyRenderer;
     private PlayerController _player;
@@ -160,7 +162,8 @@ public class MainGame : Game
         }
         if (_chestScreen.IsOpen)
             _chestScreen.Close();
-        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
+        _itemDrops.Clear();
+        _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater, _itemDrops);
         WireInteractionEvents();
         _health.Reset();
         _wasInWater = false;
@@ -219,9 +222,12 @@ public class MainGame : Game
         _fallingBlockRenderer = new FallingBlockRenderer(GraphicsDevice, _atlas);
         _mobs = new Mobs();
         _mobRenderer = new MobRenderer(GraphicsDevice, _atlas);
+        _itemDrops = new ItemDrops();
+        _itemDropRenderer = new ItemDropRenderer(GraphicsDevice, _atlas);
         _skyRenderer = new SkyRenderer(GraphicsDevice, _atlas);
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
         _sounds = new GameSounds();
+        _itemDrops.PickedUp += _sounds.PlayPickup;
         _health = new PlayerHealth();
         _health.Died += RespawnPlayer;
         _furnaces = new Furnaces();
@@ -314,6 +320,7 @@ public class MainGame : Game
         _blockUpdater.Update(_chunkManager, _fallingBlocks, dt);
         _fallingBlocks.Update(_chunkManager, _blockUpdater, dt);
         _mobs.Update(_chunkManager, _player.Position, dt);
+        _itemDrops.Update(_chunkManager, _inventory, _player.Position, dt);
         _furnaces.Update(_chunkManager, dt);
         _dayNight.Update(dt);
         _playerModel.Update(_player, dt, !_inventoryScreen.IsOpen && _blockInteraction.IsMining);
@@ -535,10 +542,12 @@ public class MainGame : Game
             _playerModel.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
             _fallingBlockRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
             _mobRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
+            _itemDropRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
 
             _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
             _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);
             _mobRenderer.Draw(_camera, _mobs.All);
+            _itemDropRenderer.Draw(GraphicsDevice, _camera, _itemDrops.All);
             bool showGameplayUi = !_inventoryScreen.IsOpen && !_chestScreen.IsOpen
                 && _menu.Current == MenuScreen.Mode.Hidden;
             if (showGameplayUi)

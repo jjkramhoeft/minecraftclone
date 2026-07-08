@@ -21,6 +21,7 @@ public class BlockInteraction
     private readonly Inventory _inventory;
     private readonly PlayerController _player;
     private readonly BlockUpdater _blockUpdater;
+    private readonly ItemDrops _drops;
 
     private (int X, int Y, int Z) _miningPos;
     private BlockType _miningType;
@@ -47,12 +48,13 @@ public class BlockInteraction
     public (int X, int Y, int Z) MiningPos => _miningPos;
     public bool IsMining => _progress > 0f;
 
-    public BlockInteraction(ChunkManager world, Inventory inventory, PlayerController player, BlockUpdater blockUpdater)
+    public BlockInteraction(ChunkManager world, Inventory inventory, PlayerController player, BlockUpdater blockUpdater, ItemDrops drops)
     {
         _world = world;
         _inventory = inventory;
         _player = player;
         _blockUpdater = blockUpdater;
+        _drops = drops;
     }
 
     public void Update(FirstPersonCamera camera, MouseState mouse, MouseState previousMouse, bool allowInput, float dt)
@@ -135,9 +137,11 @@ public class BlockInteraction
 
         if (dropAllowed)
         {
+            // Drops become world entities with a pickup radius — nothing is
+            // silently lost to a full inventory anymore.
             var drop = ItemInfo.GetDrop(type);
             if (drop != ItemType.None)
-                _inventory.TryAdd(drop); // full inventory = the drop is lost
+                _drops.Spawn(drop, target.X, target.Y, target.Z);
         }
     }
 

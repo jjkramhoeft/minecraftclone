@@ -50,6 +50,9 @@ public class GameSounds
 
     public void PlaySplash() => Play(_splash, 0.8f, Jitter(0.1f));
 
+    /// <summary>Short high pop when a drop lands in the inventory.</summary>
+    public void PlayPickup() => Play(_dig[(int)Material.Plant], 0.4f, 0.8f);
+
     private void Play(SoundEffect sound, float volume, float pitch)
     {
         if (_enabled)
