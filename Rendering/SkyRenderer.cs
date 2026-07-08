@@ -66,7 +66,7 @@ public class SkyRenderer
         }
     }
 
-    public void Draw(GraphicsDevice device, FirstPersonCamera camera, DayNightCycle cycle)
+    public void Draw(GraphicsDevice device, FirstPersonCamera camera, DayNightCycle cycle, CloudRenderer clouds)
     {
         device.DepthStencilState = DepthStencilState.None;
         device.BlendState = BlendState.NonPremultiplied;
@@ -74,7 +74,7 @@ public class SkyRenderer
         device.SamplerStates[0] = SamplerState.PointClamp;
 
         if (cycle.StarAlpha > 0.01f)
-            DrawStars(device, camera, cycle);
+            DrawStars(device, camera, cycle, clouds);
         DrawSprite(device, camera, BlockInfo.TileSun, cycle.SunDirection, SunSize);
         DrawMoon(device, camera, cycle);
 
@@ -82,7 +82,7 @@ public class SkyRenderer
         device.BlendState = BlendState.Opaque;
     }
 
-    private void DrawStars(GraphicsDevice device, FirstPersonCamera camera, DayNightCycle cycle)
+    private void DrawStars(GraphicsDevice device, FirstPersonCamera camera, DayNightCycle cycle, CloudRenderer clouds)
     {
         // Stars ride the same axis the sun orbits, so they drift through the night.
         var rotation = Matrix.CreateRotationZ(-cycle.TimeOfDay * MathHelper.TwoPi);
@@ -98,7 +98,10 @@ public class SkyRenderer
             // Brightness oscillates 0.35..1 on the star's own phase and rate.
             float twinkle = 0.675f + 0.325f * MathF.Sin(
                 cycle.AnimationTime * _starTwinkleSpeed[i] + _starTwinklePhase[i]);
-            var color = Color.White * (cycle.StarAlpha * twinkle);
+            // Clouds mask stars behind them: the coverage is 0 in clear sky and
+            // 1 under a cloud cell, so covered stars drop to transparent.
+            float visible = 1f - clouds.CoverageAt(camera.Position, direction);
+            var color = Color.White * (cycle.StarAlpha * twinkle * visible);
 
             int v = i * 6;
             _starVertices[v + 0] = new VertexPositionColor(center - right - up, color);

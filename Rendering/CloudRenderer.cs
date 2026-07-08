@@ -44,6 +44,26 @@ public class CloudRenderer
 
     public void Update(float dt) => _time += dt;
 
+    /// <summary>Whether a cloud cell covers the given view direction from the
+    /// camera (1 = covered, 0 = clear sky). The star pass uses this to hide
+    /// stars behind clouds even though the cloud quads are only translucent.
+    /// Mirrors the cell/noise mapping in <see cref="Draw"/>.</summary>
+    public float CoverageAt(Vector3 cameraPos, Vector3 direction)
+    {
+        if (direction.Y <= 0.001f)
+            return 0f; // not looking up toward the layer
+        float t = (CloudY - cameraPos.Y) / direction.Y;
+        if (t <= 0f)
+            return 0f; // the layer is below/behind the view (e.g. flying above it)
+
+        float drift = _time * DriftSpeed;
+        float wx = cameraPos.X + direction.X * t;
+        float wz = cameraPos.Z + direction.Z * t;
+        int cx = (int)MathF.Floor((wx - drift) / CellSize);
+        int cz = (int)MathF.Floor(wz / CellSize);
+        return _noise.GetNoise(cx, cz) >= CoverageThreshold ? 1f : 0f;
+    }
+
     /// <param name="light">Day/night scene light — clouds dim at night too.</param>
     public void Draw(GraphicsDevice device, FirstPersonCamera camera, Vector3 light)
     {

@@ -614,7 +614,7 @@ public class MainGame : Game
 
         if (_worldActive)
         {
-            _skyRenderer.Draw(GraphicsDevice, _camera, _dayNight);
+            _skyRenderer.Draw(GraphicsDevice, _camera, _dayNight, _cloudRenderer);
             _worldRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
             _playerModel.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
             _fallingBlockRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
