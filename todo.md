@@ -10,7 +10,7 @@ Minecraft itself as the reference.
 ## Small polish (grab-bag)
 
 - [ ] Per-corner water surface smoothing so flows slope instead of stair-step.
-- [ ] Sprint field-of-view kick + swim/splash particles.
+- [x] Sprint field-of-view kick + swim/splash particles.
 - [ ] Crafting: keep the recipe-list UI (it's honestly friendlier than a grid), but
       gate advanced recipes behind a crafting table block for progression texture.
 - [x] Star twinkle + moon phases in `Rendering/SkyRenderer.cs`.

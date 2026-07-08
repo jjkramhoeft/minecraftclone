@@ -526,11 +526,56 @@ public static class ChunkMesher
             ? 1f
             : BlockInfo.GetWaterLevel(type) * (0.875f / 8f);
 
+    /// <summary>
+    /// Height of the water surface at one top corner (local x/z in {0,1}),
+    /// averaged over the four cells meeting at that corner so neighbouring cells
+    /// agree on the shared corner and the surface stays crack-free. A cell that
+    /// is part of a continuous column (water above / falling) snaps the whole
+    /// corner to full height, keeping waterfall sheets flat.
+    /// </summary>
+    private static float WaterCornerHeight(Func<int, int, int, BlockType> sample, int bx, int by, int bz, int cx, int cz)
+    {
+        int dx = cx == 0 ? -1 : 1;
+        int dz = cz == 0 ? -1 : 1;
+        float total = 0f;
+        int count = 0;
+        for (int c = 0; c < 4; c++)
+        {
+            int ox = (c & 1) == 0 ? 0 : dx;
+            int oz = (c & 2) == 0 ? 0 : dz;
+            var cell = sample(bx + ox, by, bz + oz);
+            if (!BlockInfo.IsWater(cell))
+                continue;
+            var cellAbove = sample(bx + ox, by + 1, bz + oz);
+            if (BlockInfo.IsWater(cellAbove) || cell == BlockType.WaterFall)
+                return 1f; // a full column pulls the corner all the way up
+            total += WaterHeight(cell, cellAbove);
+            count++;
+        }
+        return count > 0 ? total / count : 0f;
+    }
+
     private static void AddWaterBlock(List<VertexPositionColorTexture> vertices, List<int> indices,
         int bx, int by, int bz, BlockType type, Func<int, int, int, BlockType> sample)
     {
         var above = sample(bx, by + 1, bz);
         float myHeight = WaterHeight(type, above);
+
+        // Per-corner top heights so a flow slopes toward its shallow edges
+        // instead of stair-stepping. A full column (myHeight 1) stays a flat
+        // cube. Order matches FaceCorners' (x,z): (0,0),(1,0),(1,1),(0,1).
+        Span<float> tops = stackalloc float[4];
+        if (myHeight >= 1f)
+        {
+            tops[0] = tops[1] = tops[2] = tops[3] = 1f;
+        }
+        else
+        {
+            tops[0] = WaterCornerHeight(sample, bx, by, bz, 0, 0);
+            tops[1] = WaterCornerHeight(sample, bx, by, bz, 1, 0);
+            tops[2] = WaterCornerHeight(sample, bx, by, bz, 1, 1);
+            tops[3] = WaterCornerHeight(sample, bx, by, bz, 0, 1);
+        }
 
         for (int face = 0; face < 6; face++)
         {
@@ -543,7 +588,7 @@ public static class ChunkMesher
             {
                 // Water above/below makes the face interior.
                 if (!BlockInfo.IsWater(neighbor))
-                    AddWaterFace(vertices, indices, bx, by, bz, face, 0f, myHeight);
+                    AddWaterFace(vertices, indices, bx, by, bz, face, 0f, tops);
                 continue;
             }
 
@@ -553,12 +598,12 @@ public static class ChunkMesher
                 ? WaterHeight(neighbor, sample(bx + nx, by + 1, bz + nz))
                 : 0f;
             if (myHeight > neighborHeight)
-                AddWaterFace(vertices, indices, bx, by, bz, face, neighborHeight, myHeight);
+                AddWaterFace(vertices, indices, bx, by, bz, face, neighborHeight, tops);
         }
     }
 
     private static void AddWaterFace(List<VertexPositionColorTexture> vertices, List<int> indices,
-        int bx, int by, int bz, int face, float yBottom, float yTop)
+        int bx, int by, int bz, int face, float yBottom, ReadOnlySpan<float> tops)
     {
         byte shade = (byte)(255 * FaceShade[face]);
         var color = new Color(shade, shade, shade, WaterAlpha);
@@ -576,7 +621,20 @@ public static class ChunkMesher
         for (int i = 0; i < 4; i++)
         {
             var corner = corners[i];
-            float h = corner.Y < 0.5f ? yBottom : yTop;
+            float h;
+            if (corner.Y < 0.5f)
+            {
+                h = yBottom;
+            }
+            else
+            {
+                // Pick the top corner height for this vertex's (x,z), clamped so
+                // a sloped edge never dips below the band's bottom.
+                int cx = corner.X < 0.5f ? 0 : 1;
+                int cz = corner.Z < 0.5f ? 0 : 1;
+                int index = cz == 0 ? cx : (cx == 0 ? 3 : 2);
+                h = MathF.Max(tops[index], yBottom);
+            }
             var texCoord = uvs[i];
             if (isSide) // texture anchored at the block bottom, so bands don't stretch
                 texCoord.Y = MathHelper.Lerp(uv.W, uv.Y, h);
