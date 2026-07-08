@@ -42,7 +42,7 @@ Minecraft itself as the reference.
 ## Small polish (grab-bag)
 
 - [x] Buckets: pick up / place water sources (the flow sim makes this fun now).
-- [ ] Infinite-water rule: two adjacent sources over solid ground create a third —
+- [x] Infinite-water rule: two adjacent sources over solid ground create a third —
       removes the "dip" left when a surface source is removed.
 - [ ] Per-corner water surface smoothing so flows slope instead of stair-step.
 - [ ] Sprint field-of-view kick + swim/splash particles.

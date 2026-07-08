@@ -8,7 +8,8 @@ namespace MinecraftClone.World;
 /// it should be from its neighbors (source water above => falling, else one
 /// level below its highest side neighbor) and corrects itself, then spreads:
 /// down first, sideways only when it can't fall. Sources (BlockType.Water) are
-/// never created or destroyed by the simulation.
+/// never destroyed by the simulation, and created only by the infinite-water
+/// rule (a flowing cell flanked by two sources over solid ground).
 ///
 /// Stability: a cell already in its expected state with nothing to spread into
 /// performs zero writes and zero notifications, so a disturbance next to the
@@ -71,6 +72,17 @@ public static class WaterFlow
     {
         if (BlockInfo.IsWater(above))
             return BlockType.WaterFall;
+
+        // Infinite-water rule: two adjacent sources over solid ground breed a
+        // third, so dipping a bucket into a pool doesn't leave a hole. Ocean
+        // cells are already sources, so this never churns standing water.
+        int sources =
+            (world.GetBlock(x + 1, y, z) == BlockType.Water ? 1 : 0)
+            + (world.GetBlock(x - 1, y, z) == BlockType.Water ? 1 : 0)
+            + (world.GetBlock(x, y, z + 1) == BlockType.Water ? 1 : 0)
+            + (world.GetBlock(x, y, z - 1) == BlockType.Water ? 1 : 0);
+        if (sources >= 2 && BlockInfo.IsSolid(world.GetBlock(x, y - 1, z)))
+            return BlockType.Water;
 
         int maxSide = Math.Max(
             Math.Max(BlockInfo.GetWaterLevel(world.GetBlock(x + 1, y, z)),
