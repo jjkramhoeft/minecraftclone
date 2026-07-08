@@ -23,8 +23,8 @@ public class TerrainGenerator
     private const int WaterLevel = 37;      // valleys below this fill with water
     private const int ReedChance = 3;       // reeds on ~1/3 of eligible shoreline columns
 
-    private const int BedrockDepth = 4;     // never carve at or below this — fake bedrock
-    private const float CaveThreshold = 0.09f; // tunnel radius: both noise fields within ±this
+    private const int BedrockDepth = 2;     // never carve at or below this — fake bedrock
+    private const float CaveThreshold = 0.2f; // tunnel radius: both noise fields within ±this (original value 0.09f)
 
     private readonly FastNoiseLite _heightNoise;
     private readonly FastNoiseLite _biomeNoise;

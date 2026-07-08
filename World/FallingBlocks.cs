@@ -20,7 +20,7 @@ public class FallingBlocks
         public float Velocity;
     }
 
-    private const float Gravity = -16f;         // gentler than the player's -25 — reads better
+    private const float Gravity = -14f;         // gentler than the player's -25 — reads better
     private const float TerminalVelocity = -12f;
 
     private readonly List<Entry> _entries = new();

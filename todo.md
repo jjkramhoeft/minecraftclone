@@ -6,57 +6,8 @@ Compared against: [fogleman/Craft](https://github.com/fogleman/Craft) (C, ~10k l
 [Terasology](https://terasology.org/) (Java, survival/rendering showcase), and classic/beta
 Minecraft itself as the reference.
 
-
-## High impact — the world itself
-
-- [x] **Caves.** Carve tunnels with 3D noise (FastNoiseLite supports 3D; threshold a
-      ridged/simplex field, or swept "worm" carvers) in `World/TerrainGenerator.cs`.
-      Right now underground is solid stone, so mining has no reward loop. Skip carving
-      below y≈4 to fake bedrock. Watch interaction with `WaterLevel` (don't breach the
-      ocean floor, or embrace it and let water pour in — the flow sim already handles it).
-- [x] **Ores.** Coal + iron as new `BlockType`s with depth-banded spawn blobs. Coal
-      enables torches; iron enables a tier-3 tool set on the existing
-      `GetRequiredTier`/`GetToolTier` scaffolding in `World/BlockInfo.cs` /
-      `Items/ItemInfo.cs`. Without ores the stone tier is a dead end.
-- [x] **Biomes.** A second, low-frequency noise (temperature/moisture) selecting
-      surface palette + decoration density: desert (sand, no trees), forest (dense
-      trees), plains. Even 3 biomes breaks up the current single-texture landscape.
-      Amplitude modulation per biome gives mountains cheaply.
-- [x] **Block light propagation (torches).** The flagship visual upgrade, and Craft
-      has placeable lights already. Classic approach: per-block light nibble, BFS flood
-      from emitters on place/break, vertex color = `max(skyTint, blockLight)` in
-      `Rendering/ChunkMesher.cs` (AO already multiplies per-vertex color, so the
-      plumbing exists). Pairs with caves + coal→torch crafting to complete the loop:
-      *mine → craft torch → explore cave*.
-
-## High impact — game feel
-
-- [x] **Audio.** The game is completely silent — no `SoundEffect` usage anywhere.
-      In keeping with the zero-asset ethos (textures are procedural in
-      `Rendering/TextureAtlas.cs`), generate sounds procedurally into
-      `SoundEffect.FromStream`/`new SoundEffect(buffer,...)`: noise-burst dig/place per
-      material, splash, footsteps. Even 5 crude sounds transform the feel.
-- [x] **Health, fall damage, drowning, respawn.** The survival foundation every
-      comparison target has. Hearts on the HUD (`UI/Hud.cs`), fall damage from impact
-      velocity in `Player/PlayerPhysics.cs` (velocity is already known at landing),
-      air meter while the eye cell is water, death → respawn at spawn point, keep it
-      simple: drop nothing on death at first.
-- [x] **Simple mobs.** Even 1–2 passive animals (chicken/pig analogue) wandering on
-      land makes the world feel inhabited. The `Rendering/PlayerModel.cs` box-model +
-      walk-swing animation code generalizes to quadrupeds; `FallingBlocks` shows the
-      entity-update pattern. Hostiles can wait — pathfinding is the hard part.
-
 ## Medium — systems and UX
 
-- [x] **Menus + world slots.** No main menu, pause menu, or world list; `N` silently
-      deletes the world. `Persistence/WorldSave.cs` already takes a `worldName` — a
-      world-select screen and an Esc pause menu (resume/save/quit) close the roughest
-      UX edge. Requires letters in `UI/PixelFont.cs` (currently digits + 'x' only) —
-      extend the 3×5 glyph table to A–Z first.
-- [x] **Furnace + smelting.** Iron ore → ingots, sand → glass. First block with state
-      and a timer; follows the chest/container pattern below.
-- [x] **Chests.** First container block; needs per-block inventory storage keyed by
-      position, saved in world metadata (the chunk byte array can't hold it).
 - [ ] **Item drops as world entities.** Broken blocks currently teleport into the
       inventory (and are *lost* when it's full — see `BlockInteraction.BreakBlock`).
       Spawn a small bobbing cube entity with pickup radius instead, reusing the
@@ -92,3 +43,15 @@ Minecraft itself as the reference.
 - [ ] Crafting: keep the recipe-list UI (it's honestly friendlier than a grid), but
       gate advanced recipes behind a crafting table block for progression texture.
 - [ ] Star twinkle + moon phases in `Rendering/SkyRenderer.cs`.
+
+## Future ideas (not ready yet)
+
+- [ ] More biomes: Mountains
+- [ ] More Blocks: Cobblestone (placed stone), Clay, Bricks (from furnaced clay), Cravel, Goldore, Snow, Limestone
+- [ ] More Tree types: Birch & Pine
+- [ ] Under water visuals. Tint all blue
+- [ ] Add 'blob' caves
+- [ ] No fall damage when starting (first fall from the heavens)
+- [ ] Enemies
+- [ ] Player skins
+- [ ] Debug Terrain Generator: Calculate block frequancy
