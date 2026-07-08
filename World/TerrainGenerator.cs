@@ -31,8 +31,13 @@ public class TerrainGenerator
     // at or above SnowLine it is capped with snow.
     private const float MountainAmplitudeBoost = 12f;
     private const int MountainLift = 6;
-    private const int RockLine = 64;
-    private const int SnowLine = 72;
+    // Tuned against the actual height distribution (mountain peaks reach ~80 but
+    // taper off sharply above ~62): RockLine leaves ~10% of mountain columns as
+    // bare summit, SnowLine caps the tallest ~3%. Higher values made snow so
+    // rare it was effectively never seen in-game.
+    private const int RockLine = 58;
+    private const int SnowLine = 63;
+    private const int MaxSnowCap = 4;   // snow thickens toward the peak, up to this many blocks
 
     // Lake biome: a separate low-frequency field carves broad basins that dip
     // well below the water level, giving larger, deeper water than the ordinary
@@ -98,16 +103,20 @@ public class TerrainGenerator
                 heights[x + z * Chunk.SizeX] = height;
                 biomes[x + z * Chunk.SizeX] = (byte)biome;
 
-                // Bare rocky summits above the treeline, snow at the very top.
-                // Lake columns sit below the water line, so they never read rocky.
+                // Bare rocky summits above the treeline, snow-capped near the
+                // peak. The cap thickens with elevation so tall peaks wear a
+                // clear white crown rather than a single sliver. Lake columns
+                // sit below the water line, so they never read rocky.
                 bool rocky = biome == Biome.Mountains && height >= RockLine;
+                int snowCap = rocky && height >= SnowLine
+                    ? Math.Min(MaxSnowCap, height - SnowLine + 1) : 0;
                 bool sandy = height <= SandLevel || biome == Biome.Desert;
 
                 for (int y = 0; y <= height; y++)
                 {
                     BlockType type =
+                        rocky ? (y > height - snowCap ? BlockType.Snow : BlockType.Stone) :
                         y < height - DirtDepth ? BlockType.Stone :
-                        rocky ? (y == height && height >= SnowLine ? BlockType.Snow : BlockType.Stone) :
                         sandy ? BlockType.Sand :
                         y == height ? BlockType.Grass :
                         BlockType.Dirt;
