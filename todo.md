@@ -15,7 +15,7 @@ Minecraft itself as the reference.
 - [x] **Sneak.** LeftShift while grounded: slower speed + edge-stop (don't walk off
       the block you're standing on). Small change in `Player/PlayerController.cs` +
       an extra ledge probe in `PlayerPhysics`; makes building over voids viable.
-- [ ] **Clouds.** Craft has them and they're cheap: a flat translucent quad layer at
+- [x] **Clouds.** Craft has them and they're cheap: a flat translucent quad layer at
       y≈100 scrolled by time, or noise-sampled cell quads. Big sky-feel win for an
       afternoon of work.
 - [x] **On-screen debug overlay (F3).** Stats currently go to the window title.

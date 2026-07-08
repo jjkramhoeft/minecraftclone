@@ -34,6 +34,7 @@ public class MainGame : Game
     private ItemDropRenderer _itemDropRenderer;
     private DayNightCycle _dayNight;
     private SkyRenderer _skyRenderer;
+    private CloudRenderer _cloudRenderer;
     private PlayerController _player;
     private BlockInteraction _blockInteraction;
     private BlockHighlight _blockHighlight;
@@ -226,6 +227,7 @@ public class MainGame : Game
         _itemDrops = new ItemDrops();
         _itemDropRenderer = new ItemDropRenderer(GraphicsDevice, _atlas);
         _skyRenderer = new SkyRenderer(GraphicsDevice, _atlas);
+        _cloudRenderer = new CloudRenderer(GraphicsDevice);
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
         _sounds = new GameSounds();
         _itemDrops.PickedUp += _sounds.PlayPickup;
@@ -328,6 +330,7 @@ public class MainGame : Game
         _itemDrops.Update(_chunkManager, _inventory, _player.Position, dt);
         _furnaces.Update(_chunkManager, dt);
         _dayNight.Update(dt);
+        _cloudRenderer.Update(dt);
         _playerModel.Update(_player, dt, !_inventoryScreen.IsOpen && _blockInteraction.IsMining);
 
         if (keyboard.IsKeyDown(Keys.F5) && _previousKeyboard.IsKeyUp(Keys.F5))
@@ -550,6 +553,7 @@ public class MainGame : Game
             _itemDropRenderer.SetEnvironment(_dayNight.LightColor, _dayNight.SkyColor);
 
             _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
+            _cloudRenderer.Draw(GraphicsDevice, _camera, _dayNight.LightColor);
             _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);
             _mobRenderer.Draw(_camera, _mobs.All);
             _itemDropRenderer.Draw(GraphicsDevice, _camera, _itemDrops.All);
