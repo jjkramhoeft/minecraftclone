@@ -20,7 +20,7 @@ Minecraft itself as the reference.
       afternoon of work.
 - [x] **On-screen debug overlay (F3).** Stats currently go to the window title.
       After PixelFont gets letters, draw position/fps/chunk counts as an overlay.
-- [ ] **Tool durability.** `ItemStack` needs a damage value; tools currently last
+- [x] **Tool durability.** `ItemStack` needs a damage value; tools currently last
       forever, which cheapens the tier ladder.
 
 ## Performance headroom (fine today, will bite as the world grows)

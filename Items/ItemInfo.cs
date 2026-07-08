@@ -30,6 +30,15 @@ public static class ItemInfo
         _ => ToolClass.None,
     };
 
+    /// <summary>Block breaks a tool survives; 0 = not damageable.</summary>
+    public static int GetMaxDurability(ItemType item) => GetToolTier(item) switch
+    {
+        1 => 60,
+        2 => 132,
+        3 => 251,
+        _ => 0,
+    };
+
     /// <summary>0 = hand, 1 = wooden tools, 2 = stone tools, 3 = iron tools.</summary>
     public static int GetToolTier(ItemType item) => item switch
     {

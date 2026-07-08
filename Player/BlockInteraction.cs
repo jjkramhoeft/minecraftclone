@@ -123,7 +123,23 @@ public class BlockInteraction
 
         _progress += dt * speed / hardness;
         if (_progress >= 1f)
+        {
             BreakBlock(target, type, dropAllowed: !underTier);
+            DamageHeldTool();
+        }
+    }
+
+    /// <summary>One point of wear per timed break, whatever the tool hit; the
+    /// tool vanishes when its durability runs out.</summary>
+    private void DamageHeldTool()
+    {
+        int slot = _inventory.SelectedIndex;
+        var stack = _inventory[slot];
+        int max = ItemInfo.GetMaxDurability(stack.Item);
+        if (max <= 0)
+            return;
+        stack.Damage++;
+        _inventory[slot] = stack.Damage >= max ? ItemStack.Empty : stack;
     }
 
     private void BreakBlock(RaycastHit target, BlockType type, bool dropAllowed)

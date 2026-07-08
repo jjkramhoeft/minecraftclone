@@ -12,6 +12,9 @@ public class InventorySlotData
     public int Slot { get; set; }
     public int Item { get; set; }
     public int Count { get; set; }
+
+    /// <summary>Tool wear; absent in pre-v5 saves (defaults to fresh).</summary>
+    public int Damage { get; set; }
 }
 
 public class FurnaceData
@@ -34,7 +37,7 @@ public class ChestData
 
 public class WorldMetadata
 {
-    public const int CurrentFormatVersion = 4; // v2 added Inventory; v3 furnaces; v4 chests
+    public const int CurrentFormatVersion = 5; // v2 added Inventory; v3 furnaces; v4 chests; v5 tool durability
 
     public int FormatVersion { get; set; } = CurrentFormatVersion;
     public int Seed { get; set; }

@@ -32,6 +32,16 @@ public static class SlotRenderer
             IconSize, IconSize);
         spriteBatch.Draw(atlas.Texture, iconRect, source, Color.White);
 
+        int maxDurability = ItemInfo.GetMaxDurability(stack.Item);
+        if (maxDurability > 0 && stack.Damage > 0)
+        {
+            float remaining = 1f - stack.Damage / (float)maxDurability;
+            var track = new Rectangle(iconRect.X, iconRect.Bottom - 3, iconRect.Width, 3);
+            spriteBatch.Draw(pixel, track, new Color(20, 20, 20, 220));
+            var fill = new Rectangle(track.X, track.Y, (int)(track.Width * remaining), 3);
+            spriteBatch.Draw(pixel, fill, Color.Lerp(new Color(200, 40, 40), new Color(60, 200, 60), remaining));
+        }
+
         if (stack.Count > 1)
         {
             string count = stack.Count.ToString();

@@ -125,7 +125,7 @@ public class MainGame : Game
         {
             foreach (var slot in meta.Inventory)
                 if (slot.Slot >= 0 && slot.Slot < Inventory.Size)
-                    _inventory[slot.Slot] = new ItemStack((ItemType)slot.Item, slot.Count);
+                    _inventory[slot.Slot] = new ItemStack((ItemType)slot.Item, slot.Count) { Damage = slot.Damage };
         }
 
         _camera.Yaw = meta?.Yaw ?? 0f;
@@ -158,7 +158,7 @@ public class MainGame : Game
                 if (c.Slots != null)
                     foreach (var s in c.Slots)
                         if (s.Slot >= 0 && s.Slot < Chests.ChestSize)
-                            slots[s.Slot] = new ItemStack((ItemType)s.Item, s.Count);
+                            slots[s.Slot] = new ItemStack((ItemType)s.Item, s.Count) { Damage = s.Damage };
                 _chests.Restore(c.X, c.Y, c.Z, slots);
             }
         }
@@ -450,7 +450,7 @@ public class MainGame : Game
         for (int i = 0; i < Inventory.Size; i++)
         {
             if (!_inventory[i].IsEmpty)
-                inventorySlots.Add(new InventorySlotData { Slot = i, Item = (int)_inventory[i].Item, Count = _inventory[i].Count });
+                inventorySlots.Add(new InventorySlotData { Slot = i, Item = (int)_inventory[i].Item, Count = _inventory[i].Count, Damage = _inventory[i].Damage });
         }
 
         var chestData = new List<ChestData>();
@@ -459,7 +459,7 @@ public class MainGame : Game
             var slotData = new List<InventorySlotData>();
             for (int i = 0; i < slots.Length; i++)
                 if (!slots[i].IsEmpty)
-                    slotData.Add(new InventorySlotData { Slot = i, Item = (int)slots[i].Item, Count = slots[i].Count });
+                    slotData.Add(new InventorySlotData { Slot = i, Item = (int)slots[i].Item, Count = slots[i].Count, Damage = slots[i].Damage });
             chestData.Add(new ChestData { X = pos.X, Y = pos.Y, Z = pos.Z, Slots = slotData });
         }
 
