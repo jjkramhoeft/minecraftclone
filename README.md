@@ -8,7 +8,7 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 
 ## Features
 
-- **Infinite terrain** that streams in around you on background threads, deterministic from one world seed: three biomes (grassy **plains**, mountainous **forests**, flat sandy **deserts**) blended from a noise field, with lakes, cave systems, and a fake-bedrock floor
+- **Infinite terrain** that streams in around you on background threads, deterministic from one world seed: four biomes (grassy **plains**, wooded **forests**, flat sandy **deserts**, and towering **mountains** — pine on the lower slopes, bare rock above the treeline, and snow-capped peaks) blended from a noise field, with lakes, cave systems, and a fake-bedrock floor
 - **Trees & plants**: oak, birch, and pine trees (pine forests carpeted with ferns), flowers in three colors, and reed beds along shorelines — all drawn as cross-quads in an alpha-test pass
 - **Ores**: coal and iron seams buried in the stone, coal shallow and common, iron deeper and rarer
 - **First-person movement** with gravity, jumping, collision, sprinting, sneaking (with a ledge-stop so you don't walk off edges), swimming, and a free-fly mode
@@ -91,7 +91,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 | `Chunk.cs` | Storage for one 16×128×16 column of blocks — a flat `byte[]` plus per-cell block-light and sky-light arrays, with dirty/modified flags |
 | `ChunkCoord.cs` | A chunk's position in the 2D chunk grid |
 | `ChunkManager.cs` | The heart of the world: streams chunks in and out around the player, schedules background generation/meshing, and exposes `GetBlock`/`SetBlock` in world coordinates — the single block API used by rendering, physics, and raycasting |
-| `TerrainGenerator.cs` | Fills chunks deterministically from the seed: fBm heightmap, three biomes, stone/dirt/grass strata, sandy lowlands, valley-filled lakes, spaghetti caves, coal/iron ore blobs, oak/birch/pine trees, ferns, flowers, and shoreline reeds |
+| `TerrainGenerator.cs` | Fills chunks deterministically from the seed: fBm heightmap, four biomes, stone/dirt/grass strata, sandy lowlands, snow-capped mountains, valley-filled lakes, spaghetti caves, coal/iron ore blobs, oak/birch/pine trees, ferns, flowers, and shoreline reeds |
 | `BlockUpdater.cs` | Tick-based block updates: detaches unsupported gravity blocks, pops unsupported plants, and feeds the water automaton its disturbed cells |
 | `FallingBlocks.cs` | Airborne gravity blocks (sand): smooth accelerated fall, landing back into the grid (settled on exit so none are lost) |
 | `WaterFlow.cs` | Self-correcting water cellular automaton: sources, decrementing sideways flow levels, falling water, draining orphaned flows, and two-source infill for bucket refills |

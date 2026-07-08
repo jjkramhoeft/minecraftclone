@@ -50,4 +50,8 @@ public enum BlockType : byte
     // Placed stone turns to cobblestone and mines back into a stone item, so
     // cobblestone is never held as an item and needs no ItemType entry.
     Cobblestone = 35,
+    // Snow-caps mountain peaks. Unlike the other id >= 30 blocks it IS a held
+    // item, so it needs an out-of-range ItemType (see ItemType.Snow) wired up
+    // explicitly in ItemInfo.TryGetBlock/FromBlock rather than the plain cast.
+    Snow = 36,
 }

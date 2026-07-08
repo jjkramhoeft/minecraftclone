@@ -46,4 +46,7 @@ public enum ItemType : ushort
     IronShovel = 43,
     Bucket = 44,
     WaterBucket = 45,
+    // Block item whose BlockType id (36) falls outside the 1–31 mirror, so it
+    // gets its own id here and explicit mapping in ItemInfo.
+    Snow = 46,
 }

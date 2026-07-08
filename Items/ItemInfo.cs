@@ -10,6 +10,12 @@ public static class ItemInfo
     /// is safe because ItemType mirrors BlockType in that range.</summary>
     public static bool TryGetBlock(ItemType item, out BlockType block)
     {
+        // Snow's block id (36) is outside the mirror, so it maps explicitly.
+        if (item == ItemType.Snow)
+        {
+            block = BlockType.Snow;
+            return true;
+        }
         block = default;
         ushort id = (ushort)item;
         if (id == 0 || id >= 32 || BlockInfo.IsWater((BlockType)(byte)id))
@@ -18,7 +24,8 @@ public static class ItemInfo
         return true;
     }
 
-    public static ItemType FromBlock(BlockType block) => (ItemType)(byte)block;
+    public static ItemType FromBlock(BlockType block) =>
+        block == BlockType.Snow ? ItemType.Snow : (ItemType)(byte)block;
 
     public static int MaxStack(ItemType item) =>
         item is ItemType.Bucket or ItemType.WaterBucket || GetToolClass(item) != ToolClass.None ? 1 : 64;

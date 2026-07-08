@@ -8,6 +8,7 @@ public enum Biome : byte
     Desert,
     Plains,
     Forest,
+    Mountains,
 }
 
 /// <summary>
@@ -22,6 +23,15 @@ public class TerrainGenerator
     private const int SandLevel = 38;       // surfaces at or below this are sandy
     private const int WaterLevel = 37;      // valleys below this fill with water
     private const int ReedChance = 3;       // reeds on ~1/3 of eligible shoreline columns
+
+    // Mountain biome: forest's peak amplitude is 24, so +12 gives ~150% taller
+    // peaks. The lift raises the whole biome so even the slopes stand above the
+    // surrounding forest. Above RockLine the surface is bare stone (no trees);
+    // at or above SnowLine it is capped with snow.
+    private const float MountainAmplitudeBoost = 12f;
+    private const int MountainLift = 6;
+    private const int RockLine = 64;
+    private const int SnowLine = 72;
 
     private const int BedrockDepth = 2;     // never carve at or below this — fake bedrock
     private const float CaveThreshold = 0.2f; // tunnel radius: both noise fields within ±this (original value 0.09f)
@@ -74,21 +84,34 @@ public class TerrainGenerator
                 float biomeValue = _biomeNoise.GetNoise(worldX, worldZ); // [-1, 1]
                 Biome biome =
                     biomeValue > 0.35f ? Biome.Desert :
+                    biomeValue < -0.55f ? Biome.Mountains :
                     biomeValue < -0.15f ? Biome.Forest :
                     Biome.Plains;
                 biomes[x + z * Chunk.SizeX] = (byte)biome;
 
                 // Deserts (high biomeValue) are flat, forests mountainous.
                 float amplitude = MathHelper.Lerp(24f, 9f, (biomeValue + 1f) * 0.5f);
+                float lift = 0f;
+                if (biome == Biome.Mountains)
+                {
+                    // Ramp 0->1 across the mountain band (-0.55 .. -1) so the
+                    // boost fades in at the forest border with no height cliff.
+                    float t = MathHelper.Clamp((-0.55f - biomeValue) / 0.45f, 0f, 1f);
+                    amplitude += t * MountainAmplitudeBoost;
+                    lift = t * MountainLift;
+                }
                 float noise = _heightNoise.GetNoise(worldX, worldZ); // [-1, 1]
-                int height = (int)MathHelper.Clamp(BaseHeight + noise * amplitude, 1, Chunk.SizeY - 1);
+                int height = (int)MathHelper.Clamp(BaseHeight + lift + noise * amplitude, 1, Chunk.SizeY - 1);
                 heights[x + z * Chunk.SizeX] = height;
                 bool sandy = height <= SandLevel || biome == Biome.Desert;
+                // Bare rocky summits above the treeline, snow at the very top.
+                bool rocky = biome == Biome.Mountains && height >= RockLine;
 
                 for (int y = 0; y <= height; y++)
                 {
                     BlockType type =
                         y < height - DirtDepth ? BlockType.Stone :
+                        rocky ? (y == height && height >= SnowLine ? BlockType.Snow : BlockType.Stone) :
                         sandy ? BlockType.Sand :
                         y == height ? BlockType.Grass :
                         BlockType.Dirt;
@@ -113,6 +136,7 @@ public class TerrainGenerator
     private static int TreeSpacingFor(Biome biome) => biome switch
     {
         Biome.Forest => 19,
+        Biome.Mountains => 27,  // sparser pines on the lower, grassy slopes
         Biome.Plains => 149,
         _ => 0,
     };
@@ -262,7 +286,8 @@ public class TerrainGenerator
         {
             for (int z = 2; z < Chunk.SizeZ - 2; z++)
             {
-                int spacing = TreeSpacingFor((Biome)biomes[x + z * Chunk.SizeX]);
+                Biome biome = (Biome)biomes[x + z * Chunk.SizeX];
+                int spacing = TreeSpacingFor(biome);
                 if (spacing == 0)
                     continue;
                 int worldX = chunk.Coord.X * Chunk.SizeX + x;
@@ -275,12 +300,19 @@ public class TerrainGenerator
                 if (chunk.GetBlock(x, surface, z) != BlockType.Grass)
                     continue;
 
-                // Species from a separately-salted hash so it doesn't correlate
-                // with the trunk-height bits below.
-                int speciesRoll = Hash(worldX, worldZ, Seed ^ 0x6D5A4C3B) % 100;
-                TreeSpecies species = speciesRoll < 5 ? TreeSpecies.Birch
-                    : speciesRoll < 15 ? TreeSpecies.Pine
-                    : TreeSpecies.Oak;
+                // Mountains grow pines only; elsewhere birch (~5%) and pine
+                // (~10%) sprinkle in among the oaks. Species from a separately-
+                // salted hash so it doesn't correlate with the trunk-height bits.
+                TreeSpecies species;
+                if (biome == Biome.Mountains)
+                    species = TreeSpecies.Pine;
+                else
+                {
+                    int speciesRoll = Hash(worldX, worldZ, Seed ^ 0x6D5A4C3B) % 100;
+                    species = speciesRoll < 5 ? TreeSpecies.Birch
+                        : speciesRoll < 15 ? TreeSpecies.Pine
+                        : TreeSpecies.Oak;
+                }
 
                 if (species == TreeSpecies.Pine)
                 {

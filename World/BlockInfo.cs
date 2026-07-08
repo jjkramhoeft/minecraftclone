@@ -89,6 +89,7 @@ public static class BlockInfo
     public const int TilePineLeaves = 57;
     public const int TileFern = 58;
     public const int TileCobblestone = 59;
+    public const int TileSnow = 60;
 
     /// <summary>Solid blocks collide and cast ambient occlusion. Plants are
     /// deliberately NOT solid — you walk through them.</summary>
@@ -169,6 +170,7 @@ public static class BlockInfo
         BlockType.Dirt => TileDirt,
         BlockType.Stone => TileStone,
         BlockType.Cobblestone => TileCobblestone,
+        BlockType.Snow => TileSnow,
         BlockType.Sand => TileSand,
         BlockType.Wood => face is BlockFace.Top or BlockFace.Bottom ? TileWoodTop : TileWoodSide,
         BlockType.BirchLog => face is BlockFace.Top or BlockFace.Bottom ? TileBirchTop : TileBirchBark,
@@ -214,7 +216,7 @@ public static class BlockInfo
     /// 0 = breaks instantly on click.</summary>
     public static float GetHardness(BlockType type) => type switch
     {
-        BlockType.Grass or BlockType.Dirt or BlockType.Sand => 0.75f,
+        BlockType.Grass or BlockType.Dirt or BlockType.Sand or BlockType.Snow => 0.75f,
         BlockType.Leaves or BlockType.BirchLeaves or BlockType.PineLeaves => 0.3f,
         BlockType.Wood or BlockType.BirchLog or BlockType.PineLog => 2f,
         BlockType.Planks or BlockType.Chest or BlockType.CraftingTable => 1.5f,
@@ -233,7 +235,7 @@ public static class BlockInfo
         BlockType.Wood or BlockType.Planks or BlockType.Leaves or BlockType.Chest
             or BlockType.CraftingTable or BlockType.BirchLog or BlockType.PineLog
             or BlockType.BirchLeaves or BlockType.PineLeaves => ToolClass.Axe,
-        BlockType.Grass or BlockType.Dirt or BlockType.Sand => ToolClass.Shovel,
+        BlockType.Grass or BlockType.Dirt or BlockType.Sand or BlockType.Snow => ToolClass.Shovel,
         _ => ToolClass.None,
     };
 

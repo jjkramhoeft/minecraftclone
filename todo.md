@@ -6,6 +6,12 @@ Compared against: [fogleman/Craft](https://github.com/fogleman/Craft) (C, ~10k l
 [Terasology](https://terasology.org/) (Java, survival/rendering showcase), and classic/beta
 Minecraft itself as the reference.
 
+## Implementation
+
+- [x] New mountain biome, including a new block snow. The biome should have even taler mountains than forest (150%) the only
+      trees should be pine trees. The top of the mountains should have no trees and at the utter top it shoud be snow blocks. 
+- [ ] New lake biome, Should have lager and deeper water      
+
 ## Future ideas (not ready yet)
 
 - [ ] More biomes: Mountains, Pine forest, Ocean

@@ -41,6 +41,7 @@ public class TextureAtlas
         "glass", "chest_side", "chest_front", "bucket", "water_bucket",
         "crafting_top", "crafting_side", "birch_bark", "birch_top", "birch_leaves",
         "pine_bark", "pine_top", "pine_leaves", "fern", "cobblestone",
+        "snow",
     };
 
     public Texture2D Texture { get; }
@@ -119,6 +120,7 @@ public class TextureAtlas
         DrawLeavesTile(pixels, BlockInfo.TilePineLeaves, new Color(40, 96, 48), new Color(24, 66, 32));
         DrawFern(pixels);
         DrawCobblestone(pixels);
+        DrawSpeckled(pixels, BlockInfo.TileSnow, new Color(240, 244, 250), 6);
 
         return pixels;
     }
