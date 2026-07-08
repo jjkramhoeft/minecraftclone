@@ -46,8 +46,9 @@ Minecraft itself as the reference.
 
 ## Future ideas (not ready yet)
 
-- [ ] More biomes: Mountains
-- [ ] More Blocks: Cobblestone (placed stone), Clay, Bricks (from furnaced clay), Cravel, Goldore, Snow, Limestone
+- [ ] More biomes: Mountains, Pine forest, Ocean
+- [ ] More Blocks: Cobblestone (placed stone), Clay, Bricks (from furnaced clay), Cravel, 
+      Snow, Limestone, Goldore, Gold, Fern, Cactus
 - [ ] More Tree types: Birch & Pine
 - [ ] Under water visuals. Tint all blue
 - [ ] Add 'blob' caves
@@ -55,3 +56,4 @@ Minecraft itself as the reference.
 - [ ] Enemies
 - [ ] Player skins
 - [ ] Debug Terrain Generator: Calculate block frequancy
+- [ ] Longer view distance
