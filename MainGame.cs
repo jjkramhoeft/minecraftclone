@@ -46,6 +46,7 @@ public class MainGame : Game
     private PixelFont _font;
     private GameSounds _sounds;
     private PlayerHealth _health;
+    private Furnaces _furnaces;
 
     // Footstep/splash state, driven from player movement each frame.
     private Vector3 _lastStepPosition;
@@ -136,6 +137,12 @@ public class MainGame : Game
         _blockUpdater = new BlockUpdater();
         _fallingBlocks.Clear();
         _mobs.Clear();
+        _furnaces.Clear();
+        if (meta?.Furnaces != null)
+        {
+            foreach (var f in meta.Furnaces)
+                _furnaces.Restore(f.X, f.Y, f.Z, (ItemType)f.OutputItem, f.OutputCount, f.SecondsRemaining);
+        }
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         WireInteractionEvents();
         _health.Reset();
@@ -200,6 +207,7 @@ public class MainGame : Game
         _sounds = new GameSounds();
         _health = new PlayerHealth();
         _health.Died += RespawnPlayer;
+        _furnaces = new Furnaces();
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
@@ -276,6 +284,7 @@ public class MainGame : Game
         _blockUpdater.Update(_chunkManager, _fallingBlocks, dt);
         _fallingBlocks.Update(_chunkManager, _blockUpdater, dt);
         _mobs.Update(_chunkManager, _player.Position, dt);
+        _furnaces.Update(_chunkManager, dt);
         _dayNight.Update(dt);
         _playerModel.Update(_player, dt, !_inventoryScreen.IsOpen && _blockInteraction.IsMining);
 
@@ -308,6 +317,12 @@ public class MainGame : Game
         _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
         _blockInteraction.BlockBroken += _sounds.PlayBreak;
         _blockInteraction.BlockPlaced += _sounds.PlayPlace;
+        _blockInteraction.UseBlock = (x, y, z, _) => _furnaces.Use(_chunkManager, _inventory, x, y, z);
+        _blockInteraction.BlockBrokenAt += (x, y, z, type) =>
+        {
+            if (type is BlockType.Furnace or BlockType.FurnaceLit)
+                _furnaces.OnBroken(_inventory, x, y, z);
+        };
     }
 
     /// <summary>Footsteps every couple of blocks walked on solid ground, and a
@@ -374,6 +389,15 @@ public class MainGame : Game
                 inventorySlots.Add(new InventorySlotData { Slot = i, Item = (int)_inventory[i].Item, Count = _inventory[i].Count });
         }
 
+        var furnaceData = new List<FurnaceData>();
+        foreach (var (pos, state) in _furnaces.States)
+            furnaceData.Add(new FurnaceData
+            {
+                X = pos.X, Y = pos.Y, Z = pos.Z,
+                OutputItem = (int)state.Output, OutputCount = state.OutputCount,
+                SecondsRemaining = state.SecondsRemaining,
+            });
+
         _chunkManager.SaveAllModified();
         _worldSave.SaveMetadata(new WorldMetadata
         {
@@ -387,6 +411,7 @@ public class MainGame : Game
             IsFlying = _player.IsFlying,
             Inventory = inventorySlots,
             TimeOfDay = _dayNight.TimeOfDay,
+            Furnaces = furnaceData,
         });
     }
 

@@ -53,7 +53,7 @@ Minecraft itself as the reference.
       world-select screen and an Esc pause menu (resume/save/quit) close the roughest
       UX edge. Requires letters in `UI/PixelFont.cs` (currently digits + 'x' only) —
       extend the 3×5 glyph table to A–Z first.
-- [ ] **Furnace + smelting.** Iron ore → ingots, sand → glass. First block with state
+- [x] **Furnace + smelting.** Iron ore → ingots, sand → glass. First block with state
       and a timer; follows the chest/container pattern below.
 - [ ] **Chests.** First container block; needs per-block inventory storage keyed by
       position, saved in world metadata (the chunk byte array can't hold it).

@@ -71,11 +71,24 @@ public static class BlockInfo
     // Mob skins (never on block faces)
     public const int TilePig = 40;
     public const int TileChicken = 41;
+    public const int TileFurnaceSide = 42;
+    public const int TileFurnaceFront = 43;
+    public const int TileFurnaceFrontLit = 44;
+    public const int TileGlass = 45;
 
-    /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
-    /// occlusion. Plants are deliberately NOT solid — you walk through them.</summary>
+    /// <summary>Solid blocks collide and cast ambient occlusion. Plants are
+    /// deliberately NOT solid — you walk through them.</summary>
     public static bool IsSolid(BlockType type) =>
         type != BlockType.Air && !IsWater(type) && !IsPlant(type);
+
+    /// <summary>Opaque blocks hide their neighbors' touching faces. Glass is
+    /// solid but see-through, so it never culls anything.</summary>
+    public static bool IsOpaque(BlockType type) =>
+        IsSolid(type) && type != BlockType.Glass;
+
+    /// <summary>Blocks that respond to right-click instead of being built against.</summary>
+    public static bool IsInteractable(BlockType type) =>
+        type is BlockType.Furnace or BlockType.FurnaceLit;
 
     /// <summary>Source water and every flowing/falling variant.</summary>
     public static bool IsWater(BlockType type) =>
@@ -111,8 +124,12 @@ public static class BlockInfo
     };
 
     /// <summary>Block-light level (0-15) this block radiates.</summary>
-    public static byte GetLightEmission(BlockType type) =>
-        type == BlockType.Torch ? (byte)14 : (byte)0;
+    public static byte GetLightEmission(BlockType type) => type switch
+    {
+        BlockType.Torch => 14,
+        BlockType.FurnaceLit => 13,
+        _ => 0,
+    };
 
     /// <summary>What the crosshair raycast can hit: solid blocks and plants,
     /// but never water or air.</summary>
@@ -141,6 +158,13 @@ public static class BlockInfo
         BlockType.CoalOre => TileCoalOre,
         BlockType.IronOre => TileIronOre,
         BlockType.Torch => TileTorch,
+        // No block orientation, so the mouth shows on all four sides.
+        BlockType.Furnace or BlockType.FurnaceLit => face switch
+        {
+            BlockFace.Top or BlockFace.Bottom => TileFurnaceSide,
+            _ => type == BlockType.FurnaceLit ? TileFurnaceFrontLit : TileFurnaceFront,
+        },
+        BlockType.Glass => TileGlass,
         _ when IsWater(type) => TileWater,
         _ => TileDirt,
     };
@@ -153,15 +177,17 @@ public static class BlockInfo
         BlockType.Leaves => 0.3f,
         BlockType.Wood => 2f,
         BlockType.Planks => 1.5f,
-        BlockType.Stone or BlockType.Bricks => 4f,
+        BlockType.Stone or BlockType.Bricks or BlockType.Furnace or BlockType.FurnaceLit => 4f,
         BlockType.CoalOre or BlockType.IronOre => 5f,
+        BlockType.Glass => 0.4f,
         _ when IsPlant(type) => 0f, // instant break
         _ => 1f,
     };
 
     public static ToolClass GetEffectiveTool(BlockType type) => type switch
     {
-        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre or BlockType.IronOre => ToolClass.Pickaxe,
+        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre or BlockType.IronOre
+            or BlockType.Furnace or BlockType.FurnaceLit => ToolClass.Pickaxe,
         BlockType.Wood or BlockType.Planks or BlockType.Leaves => ToolClass.Axe,
         BlockType.Grass or BlockType.Dirt or BlockType.Sand => ToolClass.Shovel,
         _ => ToolClass.None,
@@ -171,7 +197,8 @@ public static class BlockInfo
     /// Mining below the tier still breaks the block (slowly) but yields nothing.</summary>
     public static int GetRequiredTier(BlockType type) => type switch
     {
-        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre => 1,
+        BlockType.Stone or BlockType.Bricks or BlockType.CoalOre
+            or BlockType.Furnace or BlockType.FurnaceLit => 1,
         BlockType.IronOre => 2,
         _ => 0,
     };

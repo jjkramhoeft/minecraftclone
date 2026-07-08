@@ -14,9 +14,19 @@ public class InventorySlotData
     public int Count { get; set; }
 }
 
+public class FurnaceData
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Z { get; set; }
+    public int OutputItem { get; set; }
+    public int OutputCount { get; set; }
+    public float SecondsRemaining { get; set; }
+}
+
 public class WorldMetadata
 {
-    public const int CurrentFormatVersion = 2; // v2 added Inventory
+    public const int CurrentFormatVersion = 3; // v2 added Inventory; v3 furnaces
 
     public int FormatVersion { get; set; } = CurrentFormatVersion;
     public int Seed { get; set; }
@@ -33,6 +43,9 @@ public class WorldMetadata
 
     /// <summary>Null in pre-v2 saves — treated as an empty inventory.</summary>
     public List<InventorySlotData> Inventory { get; set; }
+
+    /// <summary>Null in pre-v3 saves — no furnace state.</summary>
+    public List<FurnaceData> Furnaces { get; set; }
 }
 
 /// <summary>

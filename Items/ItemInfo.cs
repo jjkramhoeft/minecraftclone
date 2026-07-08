@@ -46,6 +46,7 @@ public static class ItemInfo
         BlockType.Leaves => ItemType.None,
         BlockType.Air => ItemType.None,
         BlockType.CoalOre => ItemType.Coal,
+        BlockType.FurnaceLit => ItemType.Furnace,
         _ when BlockInfo.IsWater(block) => ItemType.None,
         _ => FromBlock(block),
     };

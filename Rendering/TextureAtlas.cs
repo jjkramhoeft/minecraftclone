@@ -66,6 +66,10 @@ public class TextureAtlas
         DrawTorch(pixels);
         DrawSpeckled(pixels, BlockInfo.TilePig, new Color(232, 160, 150), 8);
         DrawSpeckled(pixels, BlockInfo.TileChicken, new Color(238, 236, 230), 6);
+        DrawSpeckled(pixels, BlockInfo.TileFurnaceSide, new Color(110, 110, 110), 9);
+        DrawFurnaceFront(pixels, BlockInfo.TileFurnaceFront, lit: false);
+        DrawFurnaceFront(pixels, BlockInfo.TileFurnaceFrontLit, lit: true);
+        DrawGlass(pixels);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -422,6 +426,48 @@ public class TextureAtlas
                 SetPixel(pixels, tile, x, y, Jitter(rng, y >= 10 ? shadow : metal, 6));
         for (int x = 3; x <= 12; x++)
             SetPixel(pixels, tile, x, 5, Color.White * 0.9f); // top-edge glint
+    }
+
+    /// <summary>Furnace face: stone with a dark mouth near the bottom; the lit
+    /// variant fills the mouth with fire colors.</summary>
+    private static void DrawFurnaceFront(Color[] pixels, int tile, bool lit)
+    {
+        var rng = RngFor(tile);
+        var stone = new Color(110, 110, 110);
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Jitter(rng, stone, 9));
+
+        var mouthDark = new Color(24, 20, 18);
+        var fire = new Color(240, 150, 40);
+        var fireCore = new Color(255, 220, 110);
+        for (int y = 8; y <= 13; y++)
+        {
+            for (int x = 4; x <= 11; x++)
+            {
+                Color c = mouthDark;
+                if (lit)
+                    c = (x + y) % 3 == 0 ? fireCore : fire;
+                SetPixel(pixels, tile, x, y, Jitter(rng, c, lit ? 15 : 4));
+            }
+        }
+    }
+
+    /// <summary>Glass: transparent interior with a pale frame and a couple of
+    /// diagonal glints — meshed in the cutout (alpha-tested) pass.</summary>
+    private static void DrawGlass(Color[] pixels)
+    {
+        var frame = new Color(210, 230, 235);
+        for (int y = 0; y < TileSize; y++)
+        {
+            for (int x = 0; x < TileSize; x++)
+            {
+                bool edge = x == 0 || y == 0 || x == TileSize - 1 || y == TileSize - 1;
+                bool glint = x - y is 4 or 5 && x < 11;
+                SetPixel(pixels, BlockInfo.TileGlass, x, y,
+                    edge || glint ? frame : Color.Transparent);
+            }
+        }
     }
 
     /// <summary>Torch for the cross-quad cutout mesh: a short stick with a

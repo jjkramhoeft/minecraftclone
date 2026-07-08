@@ -113,11 +113,27 @@ public static class ChunkMesher
                         continue;
                     }
 
+                    if (type == BlockType.Glass)
+                    {
+                        // See-through solid: faces go to the alpha-tested
+                        // cutout pass; glass-vs-glass faces stay hidden so
+                        // panes read as one sheet.
+                        for (int face = 0; face < 6; face++)
+                        {
+                            var (nx, ny, nz) = FaceNormals[face];
+                            var neighbor = Sample(x + nx, y + ny, z + nz);
+                            if (!BlockInfo.IsOpaque(neighbor) && neighbor != BlockType.Glass)
+                                AddFace(cutoutVertices, cutoutIndices, lightVertices, lightIndices,
+                                    x, y, z, face, type, Sample, SampleLight);
+                        }
+                        continue;
+                    }
+
                     for (int face = 0; face < 6; face++)
                     {
                         var (nx, ny, nz) = FaceNormals[face];
                         var neighbor = Sample(x + nx, y + ny, z + nz);
-                        if (!BlockInfo.IsSolid(neighbor))
+                        if (!BlockInfo.IsOpaque(neighbor))
                             AddFace(vertices, indices, lightVertices, lightIndices,
                                 x, y, z, face, type, Sample, SampleLight);
                     }
@@ -258,7 +274,7 @@ public static class ChunkMesher
         {
             var (nx, ny, nz) = FaceNormals[face];
             var neighbor = sample(bx + nx, by + ny, bz + nz);
-            if (BlockInfo.IsSolid(neighbor))
+            if (BlockInfo.IsOpaque(neighbor))
                 continue; // hidden, as for opaque blocks
 
             if (face is (int)BlockFace.Top or (int)BlockFace.Bottom)

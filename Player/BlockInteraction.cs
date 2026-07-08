@@ -36,6 +36,13 @@ public class BlockInteraction
     public event Action<BlockType> BlockBroken;
     public event Action<BlockType> BlockPlaced;
 
+    /// <summary>Fired with the broken block's position (block-state cleanup hook).</summary>
+    public event Action<int, int, int, BlockType> BlockBrokenAt;
+
+    /// <summary>Right-click on an interactable block (furnace, chest). Return
+    /// true to absorb the click; false falls through to placement.</summary>
+    public Func<int, int, int, BlockType, bool> UseBlock;
+
     public float BreakProgress => _progress;
     public (int X, int Y, int Z) MiningPos => _miningPos;
     public bool IsMining => _progress > 0f;
@@ -124,6 +131,7 @@ public class BlockInteraction
         _progress = 0f;
         ActionPerformed?.Invoke();
         BlockBroken?.Invoke(type);
+        BlockBrokenAt?.Invoke(target.X, target.Y, target.Z, type);
 
         if (dropAllowed)
         {
@@ -135,6 +143,12 @@ public class BlockInteraction
 
     private void TryPlace(RaycastHit target)
     {
+        // Interactable blocks (furnace, chest) capture the click first.
+        var targetType = _world.GetBlock(target.X, target.Y, target.Z);
+        if (BlockInfo.IsInteractable(targetType)
+            && UseBlock?.Invoke(target.X, target.Y, target.Z, targetType) == true)
+            return;
+
         var stack = _inventory.SelectedStack;
         if (stack.IsEmpty || !ItemInfo.TryGetBlock(stack.Item, out var blockToPlace))
             return;
