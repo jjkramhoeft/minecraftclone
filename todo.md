@@ -9,7 +9,7 @@ Minecraft itself as the reference.
 
 ## High impact — the world itself
 
-- [ ] **Caves.** Carve tunnels with 3D noise (FastNoiseLite supports 3D; threshold a
+- [x] **Caves.** Carve tunnels with 3D noise (FastNoiseLite supports 3D; threshold a
       ridged/simplex field, or swept "worm" carvers) in `World/TerrainGenerator.cs`.
       Right now underground is solid stone, so mining has no reward loop. Skip carving
       below y≈4 to fake bedrock. Watch interaction with `WaterLevel` (don't breach the

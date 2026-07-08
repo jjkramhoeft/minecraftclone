@@ -19,7 +19,12 @@ public class TerrainGenerator
     private const int FlowerSpacing = 17;   // 1 flower per ~17 grass columns
     private const int ReedChance = 3;       // reeds on ~1/3 of eligible shoreline columns
 
+    private const int BedrockDepth = 4;     // never carve at or below this — fake bedrock
+    private const float CaveThreshold = 0.09f; // tunnel radius: both noise fields within ±this
+
     private readonly FastNoiseLite _heightNoise;
+    private readonly FastNoiseLite _caveNoiseA;
+    private readonly FastNoiseLite _caveNoiseB;
 
     public int Seed { get; }
 
@@ -31,6 +36,15 @@ public class TerrainGenerator
         _heightNoise.SetFractalType(FastNoiseLite.FractalType.FBm);
         _heightNoise.SetFractalOctaves(4);
         _heightNoise.SetFrequency(0.008f);
+
+        // "Spaghetti" caves: a cell is carved where BOTH 3D fields sit near
+        // zero, which traces winding tubes instead of open blobs.
+        _caveNoiseA = new FastNoiseLite(seed ^ 0x1B873593);
+        _caveNoiseA.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        _caveNoiseA.SetFrequency(0.045f);
+        _caveNoiseB = new FastNoiseLite(seed ^ unchecked((int)0xCC9E2D51));
+        _caveNoiseB.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        _caveNoiseB.SetFrequency(0.045f);
     }
 
     public void Generate(Chunk chunk)
@@ -62,12 +76,36 @@ public class TerrainGenerator
                 // Still water fills the valleys (no flow simulation).
                 for (int y = height + 1; y <= WaterLevel; y++)
                     chunk.SetBlock(x, y, z, BlockType.Water);
+
+                CarveCaves(chunk, x, z, worldX, worldZ, height);
             }
         }
 
         PlantTrees(chunk, heights);
         ScatterFlowers(chunk, heights);
         GrowReeds(chunk, heights);
+    }
+
+    /// <summary>
+    /// Carves tunnel caves through one column. On land the tunnels may break
+    /// the surface (cave entrances); under water the top three blocks of the
+    /// floor are kept so the ocean never drains into the cave system.
+    /// </summary>
+    private void CarveCaves(Chunk chunk, int x, int z, int worldX, int worldZ, int height)
+    {
+        bool submerged = height < WaterLevel;
+        int carveTop = submerged ? height - 3 : height;
+
+        for (int y = BedrockDepth + 1; y <= carveTop; y++)
+        {
+            float a = _caveNoiseA.GetNoise(worldX, y * 1.6f, worldZ); // stretch y: flatter, longer tunnels
+            if (a < -CaveThreshold || a > CaveThreshold)
+                continue;
+            float b = _caveNoiseB.GetNoise(worldX, y * 1.6f, worldZ);
+            if (b < -CaveThreshold || b > CaveThreshold)
+                continue;
+            chunk.SetBlock(x, y, z, BlockType.Air);
+        }
     }
 
     /// <summary>
