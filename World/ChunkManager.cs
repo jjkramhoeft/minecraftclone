@@ -20,7 +20,7 @@ namespace MinecraftClone.World;
 /// </summary>
 public class ChunkManager : IDisposable
 {
-    public const int LoadRadius = 8;                        // chunks that get meshes
+    public const int LoadRadius = 12;                       // chunks that get meshes
     private const int GenerateRadius = LoadRadius + 2;      // meshing needs all 8 neighbors (AO reads diagonals)
     private const int UnloadRadius = LoadRadius + 3;        // beyond this, chunks are dropped
     private const int MeshUploadsPerFrame = 4;              // GPU buffer creations per frame, to avoid hitches

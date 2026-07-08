@@ -13,8 +13,8 @@ namespace MinecraftClone.Rendering;
 /// </summary>
 public class WorldRenderer
 {
-    private const float FogStart = 70f;
-    private const float FogEnd = 122f; // just inside the mesh radius (8 chunks = 128 blocks)
+    private const float FogStart = 130f;
+    private const float FogEnd = 186f; // just inside the mesh radius (12 chunks = 192 blocks)
 
     private static readonly Vector3 TorchTint = new(1f, 0.85f, 0.6f);
 

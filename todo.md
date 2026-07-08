@@ -31,9 +31,9 @@ Minecraft itself as the reference.
       gradients bit-for-bit. ~22% fewer vertices on this terrain — the rest is
       cave walls whose AO tuples are all unique; measured the unrestricted
       merge too and it gains nothing more.)*
-- [ ] **Raise render distance** (`LoadRadius 8` = 128 blocks is modest; Craft ships
+- [x] **Raise render distance** (`LoadRadius 8` = 128 blocks is modest; Craft ships
       with much larger visible ranges). Likely needs greedy meshing first, plus fog
-      pushed out to match.
+      pushed out to match. *(Now 12 chunks / 192 blocks, fog 130–186.)*
 - [x] **Sub-column meshing or empty-section skip.** Chunks are full 16×128×16 meshes;
       splitting into 16³ sections culls better vertically once caves exist.
       *(Done as tight per-mesh Y bounds for frustum culling — same culling win
