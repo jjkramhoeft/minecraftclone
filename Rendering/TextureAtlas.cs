@@ -63,6 +63,7 @@ public class TextureAtlas
         DrawTool(pixels, BlockInfo.TileIronShovel, IronHeadColor, ToolShape.Shovel);
         DrawLump(pixels, BlockInfo.TileCoal, new Color(38, 38, 40));
         DrawIngot(pixels, BlockInfo.TileIronIngot, IronHeadColor);
+        DrawTorch(pixels);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -419,6 +420,34 @@ public class TextureAtlas
                 SetPixel(pixels, tile, x, y, Jitter(rng, y >= 10 ? shadow : metal, 6));
         for (int x = 3; x <= 12; x++)
             SetPixel(pixels, tile, x, 5, Color.White * 0.9f); // top-edge glint
+    }
+
+    /// <summary>Torch for the cross-quad cutout mesh: a short stick with a
+    /// glowing head, on a transparent background.</summary>
+    private static void DrawTorch(Color[] pixels)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, BlockInfo.TileTorch, x, y, Color.Transparent);
+
+        var rng = RngFor(BlockInfo.TileTorch);
+        for (int y = 6; y < TileSize; y++)
+        {
+            SetPixel(pixels, BlockInfo.TileTorch, 7, y, Jitter(rng, HandleColor, 8));
+            SetPixel(pixels, BlockInfo.TileTorch, 8, y, Jitter(rng, HandleColor, 8));
+        }
+
+        var flameCore = new Color(255, 232, 130);
+        var flameEdge = new Color(240, 140, 40);
+        SetPixel(pixels, BlockInfo.TileTorch, 7, 2, flameCore);
+        SetPixel(pixels, BlockInfo.TileTorch, 8, 2, flameCore);
+        for (int y = 3; y <= 5; y++)
+        {
+            SetPixel(pixels, BlockInfo.TileTorch, 6, y, flameEdge);
+            SetPixel(pixels, BlockInfo.TileTorch, 7, y, flameCore);
+            SetPixel(pixels, BlockInfo.TileTorch, 8, y, flameCore);
+            SetPixel(pixels, BlockInfo.TileTorch, 9, y, flameEdge);
+        }
     }
 
     private static void DrawStick(Color[] pixels)

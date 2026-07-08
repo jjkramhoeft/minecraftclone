@@ -16,7 +16,21 @@ public class WorldRenderer
 
     private readonly BasicEffect _effect;
     private readonly AlphaTestEffect _cutoutEffect;
+    private readonly BasicEffect _lightEffect;
     private readonly List<ChunkMesh> _visible = new();
+
+    // Torch light must survive night dimming, so it goes in a second pass
+    // blended with max(): the frame keeps whichever is brighter, day light or
+    // torch light — the classic max(skyTint, blockLight) without a custom shader.
+    private static readonly BlendState MaxBlend = new()
+    {
+        ColorBlendFunction = BlendFunction.Max,
+        ColorSourceBlend = Blend.One,
+        ColorDestinationBlend = Blend.One,
+        AlphaBlendFunction = BlendFunction.Max,
+        AlphaSourceBlend = Blend.One,
+        AlphaDestinationBlend = Blend.One,
+    };
 
     public WorldRenderer(GraphicsDevice device, TextureAtlas atlas)
     {
@@ -42,6 +56,21 @@ public class WorldRenderer
             ReferenceAlpha = 128,
             FogEnabled = true,
             FogColor = Color.CornflowerBlue.ToVector3(),
+            FogStart = FogStart,
+            FogEnd = FogEnd,
+        };
+
+        // Fog fades to black here so distant torch light contributes nothing
+        // (max with 0 is a no-op); the warm tint comes from DiffuseColor.
+        _lightEffect = new BasicEffect(device)
+        {
+            VertexColorEnabled = true,
+            LightingEnabled = false,
+            TextureEnabled = true,
+            Texture = atlas.Texture,
+            DiffuseColor = new Vector3(1f, 0.85f, 0.6f),
+            FogEnabled = true,
+            FogColor = Vector3.Zero,
             FogStart = FogStart,
             FogEnd = FogEnd,
         };
@@ -98,6 +127,27 @@ public class WorldRenderer
             {
                 pass.Apply();
                 mesh.DrawCutout(device);
+            }
+        }
+
+        // Torch-light pass: re-draws lit faces (and glowing torches) with
+        // max() blending on top of the day-lit result. Depth-read with the
+        // LessEqual default lets the duplicate geometry pass; CullNone keeps
+        // the torch cross-quads double-sided.
+        _lightEffect.View = camera.View;
+        _lightEffect.Projection = camera.Projection;
+        device.BlendState = MaxBlend;
+        device.DepthStencilState = DepthStencilState.DepthRead;
+
+        foreach (var mesh in _visible)
+        {
+            if (!mesh.HasLight)
+                continue;
+            _lightEffect.World = mesh.World;
+            foreach (var pass in _lightEffect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
+                mesh.DrawLight(device);
             }
         }
 

@@ -25,6 +25,7 @@ public enum ItemType : ushort
     // 14-21 = water variants, never items
     CoalOre = 22,
     IronOre = 23,
+    Torch = 24,
 
     Stick = 32,
     WoodenPickaxe = 33,

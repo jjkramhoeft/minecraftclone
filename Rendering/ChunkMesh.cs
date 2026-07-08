@@ -18,14 +18,18 @@ public class ChunkMesh : IDisposable
     private readonly IndexBuffer _waterIndexBuffer;
     private readonly VertexBuffer _cutoutVertexBuffer;
     private readonly IndexBuffer _cutoutIndexBuffer;
+    private readonly VertexBuffer _lightVertexBuffer;
+    private readonly IndexBuffer _lightIndexBuffer;
 
     public ChunkCoord Coord { get; }
     public BoundingBox Bounds { get; }
 
-    public bool IsEmpty => _indexBuffer == null && _waterIndexBuffer == null && _cutoutIndexBuffer == null;
+    public bool IsEmpty => _indexBuffer == null && _waterIndexBuffer == null
+        && _cutoutIndexBuffer == null && _lightIndexBuffer == null;
     public bool HasOpaque => _indexBuffer != null;
     public bool HasWater => _waterIndexBuffer != null;
     public bool HasCutout => _cutoutIndexBuffer != null;
+    public bool HasLight => _lightIndexBuffer != null;
 
     public Matrix World => Matrix.CreateTranslation(Coord.X * Chunk.SizeX, 0f, Coord.Z * Chunk.SizeZ);
 
@@ -58,6 +62,14 @@ public class ChunkMesh : IDisposable
             _cutoutIndexBuffer = new IndexBuffer(device, IndexElementSize.ThirtyTwoBits, data.CutoutIndices.Length, BufferUsage.WriteOnly);
             _cutoutIndexBuffer.SetData(data.CutoutIndices);
         }
+
+        if (data.LightIndices.Length > 0)
+        {
+            _lightVertexBuffer = new VertexBuffer(device, VertexPositionColorTexture.VertexDeclaration, data.LightVertices.Length, BufferUsage.WriteOnly);
+            _lightVertexBuffer.SetData(data.LightVertices);
+            _lightIndexBuffer = new IndexBuffer(device, IndexElementSize.ThirtyTwoBits, data.LightIndices.Length, BufferUsage.WriteOnly);
+            _lightIndexBuffer.SetData(data.LightIndices);
+        }
     }
 
     public void DrawOpaque(GraphicsDevice device)
@@ -87,6 +99,15 @@ public class ChunkMesh : IDisposable
         device.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _cutoutIndexBuffer.IndexCount / 3);
     }
 
+    public void DrawLight(GraphicsDevice device)
+    {
+        if (!HasLight)
+            return;
+        device.SetVertexBuffer(_lightVertexBuffer);
+        device.Indices = _lightIndexBuffer;
+        device.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _lightIndexBuffer.IndexCount / 3);
+    }
+
     public void Dispose()
     {
         _vertexBuffer?.Dispose();
@@ -95,5 +116,7 @@ public class ChunkMesh : IDisposable
         _waterIndexBuffer?.Dispose();
         _cutoutVertexBuffer?.Dispose();
         _cutoutIndexBuffer?.Dispose();
+        _lightVertexBuffer?.Dispose();
+        _lightIndexBuffer?.Dispose();
     }
 }

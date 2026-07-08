@@ -67,6 +67,7 @@ public static class BlockInfo
     public const int TileIronShovel = 36;
     public const int TileCoal = 37;
     public const int TileIronIngot = 38;
+    public const int TileTorch = 39;
 
     /// <summary>Solid blocks collide, hide neighboring faces, and cast ambient
     /// occlusion. Plants are deliberately NOT solid — you walk through them.</summary>
@@ -93,15 +94,22 @@ public static class BlockInfo
         type is >= BlockType.FlowerRed and <= BlockType.FlowerPoppy;
 
     /// <summary>Plants render as crossed quads in the cutout pass, break
-    /// instantly, and need a supporting block below.</summary>
-    public static bool IsPlant(BlockType type) => IsFlower(type) || type == BlockType.Reeds;
+    /// instantly, and need a supporting block below. Torches behave the same
+    /// way except they stand on any solid block.</summary>
+    public static bool IsPlant(BlockType type) =>
+        IsFlower(type) || type is BlockType.Reeds or BlockType.Torch;
 
     /// <summary>What a plant may stand on. Reeds also stack on themselves.</summary>
     public static bool CanSupportPlant(BlockType plant, BlockType below) => plant switch
     {
         BlockType.Reeds => below is BlockType.Sand or BlockType.Dirt or BlockType.Grass or BlockType.Reeds,
+        BlockType.Torch => IsSolid(below),
         _ => below is BlockType.Grass or BlockType.Dirt,
     };
+
+    /// <summary>Block-light level (0-15) this block radiates.</summary>
+    public static byte GetLightEmission(BlockType type) =>
+        type == BlockType.Torch ? (byte)14 : (byte)0;
 
     /// <summary>What the crosshair raycast can hit: solid blocks and plants,
     /// but never water or air.</summary>
@@ -129,6 +137,7 @@ public static class BlockInfo
         BlockType.Reeds => TileReeds,
         BlockType.CoalOre => TileCoalOre,
         BlockType.IronOre => TileIronOre,
+        BlockType.Torch => TileTorch,
         _ when IsWater(type) => TileWater,
         _ => TileDirt,
     };

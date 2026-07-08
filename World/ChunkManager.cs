@@ -89,10 +89,12 @@ public class ChunkManager : IDisposable
             return;
 
         int localX = x & 15, localZ = z & 15;
+        var oldType = chunk.GetBlock(localX, y, localZ);
         chunk.SetBlock(localX, y, localZ, type);
         chunk.IsModified = true;
         chunk.Version++;
 
+        UpdateLightForEdit(chunk, x, y, z, oldType, type);
         RemeshNow(coord);
         // A border edit changes the neighbor's face culling too.
         if (localX == 0) RemeshNow(new ChunkCoord(coord.X - 1, coord.Z));
@@ -117,10 +119,13 @@ public class ChunkManager : IDisposable
             return false;
 
         int localX = x & 15, localZ = z & 15;
+        var oldType = chunk.GetBlock(localX, y, localZ);
         chunk.SetBlock(localX, y, localZ, type);
         chunk.IsModified = true;
         chunk.Version++; // any in-flight mesh build is now stale
         chunk.MeshDirty = true;
+
+        UpdateLightForEdit(chunk, x, y, z, oldType, type);
 
         // A border edit changes the neighbor's face culling too.
         if (localX == 0) MarkMeshDirty(new ChunkCoord(coord.X - 1, coord.Z));
@@ -146,7 +151,7 @@ public class ChunkManager : IDisposable
             return;
         }
 
-        var data = ChunkMesher.Build(chunk, neighbors.Sample);
+        var data = ChunkMesher.Build(chunk, neighbors.Sample, neighbors.SampleLight);
         if (_meshes.Remove(coord, out var oldMesh))
             oldMesh.Dispose();
         _meshes[coord] = new ChunkMesh(_device, coord, data);
@@ -160,6 +165,166 @@ public class ChunkManager : IDisposable
         {
             _generating.Remove(chunk.Coord);
             _chunks[chunk.Coord] = chunk;
+            SeedLightAround(chunk.Coord);
+        }
+    }
+
+    // --- Block light -------------------------------------------------------
+    // Levels 0-15 per cell, BFS-flooded from emitters. Light is derived state:
+    // never saved, reseeded from the cached per-chunk emitter lists whenever a
+    // chunk (re)enters the loaded set, so torch light crosses chunk borders no
+    // matter which side loads first. AddLight is monotonic (only raises), so
+    // reseeding is idempotent and cheap.
+
+    private readonly Queue<(int X, int Y, int Z)> _lightSpread = new();
+    private readonly Queue<(int X, int Y, int Z, byte Level)> _lightRemove = new();
+
+    public byte GetLight(int x, int y, int z)
+    {
+        if (y < 0 || y >= Chunk.SizeY)
+            return 0;
+        return _chunks.TryGetValue(new ChunkCoord(x >> 4, z >> 4), out var chunk)
+            ? chunk.GetLight(x & 15, y, z & 15)
+            : (byte)0;
+    }
+
+    private void SetLight(int x, int y, int z, byte level)
+    {
+        var coord = new ChunkCoord(x >> 4, z >> 4);
+        if (!_chunks.TryGetValue(coord, out var chunk))
+            return;
+        int localX = x & 15, localZ = z & 15;
+        chunk.SetLight(localX, y, localZ, level);
+        chunk.Version++; // in-flight mesh builds read stale light now
+        chunk.MeshDirty = true;
+        // Border light changes the neighbor's vertex light sampling too.
+        if (localX == 0) MarkMeshDirty(new ChunkCoord(coord.X - 1, coord.Z));
+        if (localX == Chunk.SizeX - 1) MarkMeshDirty(new ChunkCoord(coord.X + 1, coord.Z));
+        if (localZ == 0) MarkMeshDirty(new ChunkCoord(coord.X, coord.Z - 1));
+        if (localZ == Chunk.SizeZ - 1) MarkMeshDirty(new ChunkCoord(coord.X, coord.Z + 1));
+    }
+
+    private void UpdateLightForEdit(Chunk chunk, int x, int y, int z, BlockType oldType, BlockType newType)
+    {
+        var local = ((byte)(x & 15), (byte)y, (byte)(z & 15));
+        if (BlockInfo.GetLightEmission(oldType) > 0)
+        {
+            chunk.Emitters.Remove(local);
+            RemoveLight(x, y, z);
+        }
+        // A solid block dropped into a lit cell blocks the light path.
+        if (BlockInfo.IsSolid(newType) && GetLight(x, y, z) > 0)
+            RemoveLight(x, y, z);
+
+        byte emission = BlockInfo.GetLightEmission(newType);
+        if (emission > 0)
+        {
+            chunk.Emitters.Add(local);
+            AddLight(x, y, z, emission);
+        }
+        else if (!BlockInfo.IsSolid(newType))
+        {
+            // An opened cell inherits from its brightest neighbor.
+            int best = Math.Max(
+                Math.Max(Math.Max(GetLight(x + 1, y, z), GetLight(x - 1, y, z)),
+                         Math.Max(GetLight(x, y, z + 1), GetLight(x, y, z - 1))),
+                Math.Max(GetLight(x, y + 1, z), GetLight(x, y - 1, z)));
+            if (best > 1)
+                AddLight(x, y, z, (byte)(best - 1));
+        }
+    }
+
+    private void AddLight(int x, int y, int z, byte level)
+    {
+        if (GetLight(x, y, z) >= level)
+            return;
+        SetLight(x, y, z, level);
+        _lightSpread.Enqueue((x, y, z));
+        SpreadPendingLight();
+    }
+
+    private void RemoveLight(int x, int y, int z)
+    {
+        byte old = GetLight(x, y, z);
+        if (old == 0)
+            return;
+        SetLight(x, y, z, 0);
+        _lightRemove.Enqueue((x, y, z, old));
+
+        while (_lightRemove.TryDequeue(out var cell))
+        {
+            Span<(int X, int Y, int Z)> neighbors = stackalloc[]
+            {
+                (cell.X + 1, cell.Y, cell.Z), (cell.X - 1, cell.Y, cell.Z),
+                (cell.X, cell.Y + 1, cell.Z), (cell.X, cell.Y - 1, cell.Z),
+                (cell.X, cell.Y, cell.Z + 1), (cell.X, cell.Y, cell.Z - 1),
+            };
+            foreach (var (nx, ny, nz) in neighbors)
+            {
+                byte neighborLight = GetLight(nx, ny, nz);
+                if (neighborLight == 0)
+                    continue;
+                if (neighborLight < cell.Level)
+                {
+                    // This cell was lit through the removed path — unlight it
+                    // and keep walking outward.
+                    SetLight(nx, ny, nz, 0);
+                    _lightRemove.Enqueue((nx, ny, nz, neighborLight));
+                }
+                else
+                {
+                    // Independent light survives at the boundary; respread it
+                    // into the darkness we just created.
+                    _lightSpread.Enqueue((nx, ny, nz));
+                }
+            }
+        }
+        SpreadPendingLight();
+    }
+
+    private void SpreadPendingLight()
+    {
+        while (_lightSpread.TryDequeue(out var cell))
+        {
+            byte level = GetLight(cell.X, cell.Y, cell.Z);
+            if (level <= 1)
+                continue;
+            Span<(int X, int Y, int Z)> neighbors = stackalloc[]
+            {
+                (cell.X + 1, cell.Y, cell.Z), (cell.X - 1, cell.Y, cell.Z),
+                (cell.X, cell.Y + 1, cell.Z), (cell.X, cell.Y - 1, cell.Z),
+                (cell.X, cell.Y, cell.Z + 1), (cell.X, cell.Y, cell.Z - 1),
+            };
+            foreach (var (nx, ny, nz) in neighbors)
+            {
+                if (ny < 0 || ny >= Chunk.SizeY || BlockInfo.IsSolid(GetBlock(nx, ny, nz)))
+                    continue;
+                if (GetLight(nx, ny, nz) < level - 1)
+                {
+                    SetLight(nx, ny, nz, (byte)(level - 1));
+                    _lightSpread.Enqueue((nx, ny, nz));
+                }
+            }
+        }
+    }
+
+    /// <summary>Repropagates every cached emitter in the 3x3 chunk neighborhood —
+    /// called when a chunk integrates so light crosses into it from all sides.</summary>
+    private void SeedLightAround(ChunkCoord center)
+    {
+        for (int dz = -1; dz <= 1; dz++)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                if (!_chunks.TryGetValue(new ChunkCoord(center.X + dx, center.Z + dz), out var chunk))
+                    continue;
+                foreach (var (lx, ly, lz) in chunk.Emitters)
+                {
+                    byte emission = BlockInfo.GetLightEmission(chunk.GetBlock(lx, ly, lz));
+                    if (emission > 0)
+                        AddLight(chunk.Coord.X * Chunk.SizeX + lx, ly, chunk.Coord.Z * Chunk.SizeZ + lz, emission);
+                }
+            }
         }
     }
 
@@ -195,7 +360,9 @@ public class ChunkManager : IDisposable
                 {
                     // Player-modified chunks come from disk; everything else
                     // regenerates deterministically from the seed.
-                    if (!_save.TryLoadChunk(chunk))
+                    if (_save.TryLoadChunk(chunk))
+                        ScanEmitters(chunk); // saved chunks may contain torches
+                    else
                         _generator.Generate(chunk);
                     _generatedChunks.Enqueue(chunk);
                 });
@@ -212,11 +379,20 @@ public class ChunkManager : IDisposable
                 int version = loaded.Version;
                 Task.Run(() =>
                 {
-                    var data = ChunkMesher.Build(loaded, neighbors.Sample);
+                    var data = ChunkMesher.Build(loaded, neighbors.Sample, neighbors.SampleLight);
                     _meshResults.Enqueue((loaded.Coord, version, data));
                 });
             }
         }
+    }
+
+    private static void ScanEmitters(Chunk chunk)
+    {
+        for (int y = 0; y < Chunk.SizeY; y++)
+            for (int z = 0; z < Chunk.SizeZ; z++)
+                for (int x = 0; x < Chunk.SizeX; x++)
+                    if (BlockInfo.GetLightEmission(chunk.GetBlock(x, y, z)) > 0)
+                        chunk.Emitters.Add(((byte)x, (byte)y, (byte)z));
     }
 
     private void UnloadDistantChunks(ChunkCoord center)
@@ -292,6 +468,15 @@ public class ChunkManager : IDisposable
             int gridX = (x + Chunk.SizeX) >> 4;
             int gridZ = (z + Chunk.SizeZ) >> 4;
             return _grid[gridX + gridZ * 3].GetBlock(x & 15, y, z & 15);
+        }
+
+        public byte SampleLight(int x, int y, int z)
+        {
+            if (y < 0 || y >= Chunk.SizeY)
+                return 0;
+            int gridX = (x + Chunk.SizeX) >> 4;
+            int gridZ = (z + Chunk.SizeZ) >> 4;
+            return _grid[gridX + gridZ * 3].GetLight(x & 15, y, z & 15);
         }
     }
 

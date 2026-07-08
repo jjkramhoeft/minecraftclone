@@ -29,4 +29,5 @@ public enum BlockType : byte
     WaterFall = 21,
     CoalOre = 22,
     IronOre = 23,
+    Torch = 24,
 }

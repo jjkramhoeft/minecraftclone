@@ -22,7 +22,7 @@ Minecraft itself as the reference.
       surface palette + decoration density: desert (sand, no trees), forest (dense
       trees), plains. Even 3 biomes breaks up the current single-texture landscape.
       Amplitude modulation per biome gives mountains cheaply.
-- [ ] **Block light propagation (torches).** The flagship visual upgrade, and Craft
+- [x] **Block light propagation (torches).** The flagship visual upgrade, and Craft
       has placeable lights already. Classic approach: per-block light nibble, BFS flood
       from emitters on place/break, vertex color = `max(skyTint, blockLight)` in
       `Rendering/ChunkMesher.cs` (AO already multiplies per-vertex color, so the

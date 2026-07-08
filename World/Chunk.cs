@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace MinecraftClone.World;
@@ -27,9 +28,15 @@ public class Chunk
     public int Version { get; set; }
 
     private readonly byte[] _blocks = new byte[SizeX * SizeY * SizeZ];
+    private readonly byte[] _light = new byte[SizeX * SizeY * SizeZ];
 
     /// <summary>Raw block storage — exposed for save/load serialization only.</summary>
     public byte[] Blocks => _blocks;
+
+    /// <summary>Positions of light-emitting blocks in this chunk, maintained by
+    /// ChunkManager so cross-chunk light can be reseeded without full rescans.
+    /// Filled by the load/generate worker, then owned by the main thread.</summary>
+    public List<(byte X, byte Y, byte Z)> Emitters { get; } = new();
 
     public Chunk(ChunkCoord coord) => Coord = coord;
 
@@ -38,6 +45,13 @@ public class Chunk
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetBlock(int x, int y, int z, BlockType type) => _blocks[Index(x, y, z)] = (byte)type;
+
+    /// <summary>Block light 0-15, derived at runtime from emitters — never saved.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public byte GetLight(int x, int y, int z) => _light[Index(x, y, z)];
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SetLight(int x, int y, int z, byte level) => _light[Index(x, y, z)] = level;
 
     public static bool InBounds(int x, int y, int z) =>
         x >= 0 && x < SizeX && y >= 0 && y < SizeY && z >= 0 && z < SizeZ;

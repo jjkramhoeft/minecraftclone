@@ -10,9 +10,11 @@ namespace MinecraftClone.Rendering;
 public record MeshData(
     VertexPositionColorTexture[] Vertices, int[] Indices,
     VertexPositionColorTexture[] WaterVertices, int[] WaterIndices,
-    VertexPositionColorTexture[] CutoutVertices, int[] CutoutIndices)
+    VertexPositionColorTexture[] CutoutVertices, int[] CutoutIndices,
+    VertexPositionColorTexture[] LightVertices, int[] LightIndices)
 {
-    public bool IsEmpty => Indices.Length == 0 && WaterIndices.Length == 0 && CutoutIndices.Length == 0;
+    public bool IsEmpty => Indices.Length == 0 && WaterIndices.Length == 0
+        && CutoutIndices.Length == 0 && LightIndices.Length == 0;
 }
 
 /// <summary>
@@ -65,7 +67,9 @@ public static class ChunkMesher
     /// Sampler for chunk-local coordinates outside this chunk's bounds — must
     /// resolve all 8 surrounding chunks (AO samples diagonals).
     /// </param>
-    public static MeshData Build(Chunk chunk, Func<int, int, int, BlockType> getOutsideBlock)
+    /// <param name="getOutsideLight">Block-light sampler with the same contract.</param>
+    public static MeshData Build(Chunk chunk, Func<int, int, int, BlockType> getOutsideBlock,
+        Func<int, int, int, byte> getOutsideLight)
     {
         var vertices = new List<VertexPositionColorTexture>();
         var indices = new List<int>();
@@ -73,9 +77,13 @@ public static class ChunkMesher
         var waterIndices = new List<int>();
         var cutoutVertices = new List<VertexPositionColorTexture>();
         var cutoutIndices = new List<int>();
+        var lightVertices = new List<VertexPositionColorTexture>();
+        var lightIndices = new List<int>();
 
         BlockType Sample(int x, int y, int z) =>
             Chunk.InBounds(x, y, z) ? chunk.GetBlock(x, y, z) : getOutsideBlock(x, y, z);
+        byte SampleLight(int x, int y, int z) =>
+            Chunk.InBounds(x, y, z) ? chunk.GetLight(x, y, z) : getOutsideLight(x, y, z);
 
         for (int y = 0; y < Chunk.SizeY; y++)
         {
@@ -91,7 +99,11 @@ public static class ChunkMesher
                     {
                         // Plants are crossed quads in the cutout pass — no
                         // faces, no culling, no AO, no neighbor reads.
-                        AddCrossQuads(cutoutVertices, cutoutIndices, x, y, z, type);
+                        AddCrossQuads(cutoutVertices, cutoutIndices, x, y, z, type, Color.White);
+                        // Emitters glow: the same quads at full brightness in
+                        // the max-blended light pass keep them bright at night.
+                        if (BlockInfo.GetLightEmission(type) > 0)
+                            AddCrossQuads(lightVertices, lightIndices, x, y, z, type, Color.White);
                         continue;
                     }
 
@@ -106,7 +118,8 @@ public static class ChunkMesher
                         var (nx, ny, nz) = FaceNormals[face];
                         var neighbor = Sample(x + nx, y + ny, z + nz);
                         if (!BlockInfo.IsSolid(neighbor))
-                            AddFace(vertices, indices, x, y, z, face, type, Sample);
+                            AddFace(vertices, indices, lightVertices, lightIndices,
+                                x, y, z, face, type, Sample, SampleLight);
                     }
                 }
             }
@@ -115,7 +128,8 @@ public static class ChunkMesher
         return new MeshData(
             vertices.ToArray(), indices.ToArray(),
             waterVertices.ToArray(), waterIndices.ToArray(),
-            cutoutVertices.ToArray(), cutoutIndices.ToArray());
+            cutoutVertices.ToArray(), cutoutIndices.ToArray(),
+            lightVertices.ToArray(), lightIndices.ToArray());
     }
 
     // The two diagonal quads of a flower, inset from the block edges. Drawn
@@ -126,7 +140,7 @@ public static class ChunkMesher
         new[] { new Vector3(0.85f, 0, 0.15f), new Vector3(0.15f, 0, 0.85f), new Vector3(0.15f, 1, 0.85f), new Vector3(0.85f, 1, 0.15f) },
     };
 
-    private static void AddCrossQuads(List<VertexPositionColorTexture> vertices, List<int> indices, int bx, int by, int bz, BlockType type)
+    private static void AddCrossQuads(List<VertexPositionColorTexture> vertices, List<int> indices, int bx, int by, int bz, BlockType type, Color color)
     {
         var uv = TextureAtlas.GetUVBounds(BlockInfo.GetFaceTile(type, BlockFace.South));
         var blockPos = new Vector3(bx, by, bz);
@@ -134,10 +148,10 @@ public static class ChunkMesher
         foreach (var quad in CrossQuads)
         {
             int baseIndex = vertices.Count;
-            vertices.Add(new VertexPositionColorTexture(blockPos + quad[0], Color.White, new Vector2(uv.X, uv.W)));
-            vertices.Add(new VertexPositionColorTexture(blockPos + quad[1], Color.White, new Vector2(uv.Z, uv.W)));
-            vertices.Add(new VertexPositionColorTexture(blockPos + quad[2], Color.White, new Vector2(uv.Z, uv.Y)));
-            vertices.Add(new VertexPositionColorTexture(blockPos + quad[3], Color.White, new Vector2(uv.X, uv.Y)));
+            vertices.Add(new VertexPositionColorTexture(blockPos + quad[0], color, new Vector2(uv.X, uv.W)));
+            vertices.Add(new VertexPositionColorTexture(blockPos + quad[1], color, new Vector2(uv.Z, uv.W)));
+            vertices.Add(new VertexPositionColorTexture(blockPos + quad[2], color, new Vector2(uv.Z, uv.Y)));
+            vertices.Add(new VertexPositionColorTexture(blockPos + quad[3], color, new Vector2(uv.X, uv.Y)));
 
             indices.Add(baseIndex + 0);
             indices.Add(baseIndex + 1);
@@ -149,7 +163,9 @@ public static class ChunkMesher
     }
 
     private static void AddFace(List<VertexPositionColorTexture> vertices, List<int> indices,
-        int bx, int by, int bz, int face, BlockType type, Func<int, int, int, BlockType> sample)
+        List<VertexPositionColorTexture> lightVertices, List<int> lightIndices,
+        int bx, int by, int bz, int face, BlockType type,
+        Func<int, int, int, BlockType> sample, Func<int, int, int, byte> sampleLight)
     {
         float shade = FaceShade[face];
         var uv = TextureAtlas.GetUVBounds(BlockInfo.GetFaceTile(type, (BlockFace)face));
@@ -165,6 +181,8 @@ public static class ChunkMesher
 
         int baseIndex = vertices.Count;
         Span<int> ao = stackalloc int[4];
+        Span<byte> torch = stackalloc byte[4];
+        int maxTorch = 0;
         for (int i = 0; i < 4; i++)
         {
             // The three blocks diagonally adjacent to this vertex, one layer
@@ -172,14 +190,24 @@ public static class ChunkMesher
             int su = 2 * Component(corners[i], uAxis) - 1;
             int sv = 2 * Component(corners[i], vAxis) - 1;
 
-            var side1 = Offset((bx + nx, by + ny, bz + nz), uAxis, su);
-            var side2 = Offset((bx + nx, by + ny, bz + nz), vAxis, sv);
+            var front = (bx + nx, by + ny, bz + nz);
+            var side1 = Offset(front, uAxis, su);
+            var side2 = Offset(front, vAxis, sv);
             var corner = Offset(side1, vAxis, sv);
             bool s1 = BlockInfo.IsSolid(sample(side1.X, side1.Y, side1.Z));
             bool s2 = BlockInfo.IsSolid(sample(side2.X, side2.Y, side2.Z));
             bool sc = BlockInfo.IsSolid(sample(corner.X, corner.Y, corner.Z));
 
             ao[i] = s1 && s2 ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (sc ? 1 : 0));
+
+            // Smooth block light: the same four cells that decide AO decide
+            // the vertex's torch light (solid cells hold 0, dimming corners).
+            int light = sampleLight(front.Item1, front.Item2, front.Item3)
+                + sampleLight(side1.X, side1.Y, side1.Z)
+                + sampleLight(side2.X, side2.Y, side2.Z)
+                + sampleLight(corner.X, corner.Y, corner.Z);
+            torch[i] = (byte)(light / 4);
+            maxTorch = Math.Max(maxTorch, torch[i]);
 
             byte brightness = (byte)(255 * shade * AoFactor[ao[i]]);
             vertices.Add(new VertexPositionColorTexture(
@@ -188,24 +216,26 @@ public static class ChunkMesher
 
         // Split the quad along the diagonal that connects the less-occluded
         // pair, otherwise AO gradients show a directional artifact.
-        if (ao[0] + ao[2] >= ao[1] + ao[3])
+        Span<int> winding = ao[0] + ao[2] >= ao[1] + ao[3]
+            ? stackalloc[] { 0, 1, 2, 0, 2, 3 }
+            : stackalloc[] { 1, 2, 3, 1, 3, 0 };
+        foreach (int offset in winding)
+            indices.Add(baseIndex + offset);
+
+        if (maxTorch == 0)
+            return;
+
+        // Duplicate the face into the light mesh: vertex color carries the
+        // torch light level; the renderer max-blends it over the day-lit pass.
+        int lightBase = lightVertices.Count;
+        for (int i = 0; i < 4; i++)
         {
-            indices.Add(baseIndex + 0);
-            indices.Add(baseIndex + 1);
-            indices.Add(baseIndex + 2);
-            indices.Add(baseIndex + 0);
-            indices.Add(baseIndex + 2);
-            indices.Add(baseIndex + 3);
+            byte brightness = (byte)(255 * (torch[i] / 15f) * AoFactor[ao[i]]);
+            lightVertices.Add(new VertexPositionColorTexture(
+                blockPos + corners[i], new Color(brightness, brightness, brightness), uvs[i]));
         }
-        else
-        {
-            indices.Add(baseIndex + 1);
-            indices.Add(baseIndex + 2);
-            indices.Add(baseIndex + 3);
-            indices.Add(baseIndex + 1);
-            indices.Add(baseIndex + 3);
-            indices.Add(baseIndex + 0);
-        }
+        foreach (int offset in winding)
+            lightIndices.Add(lightBase + offset);
     }
 
     /// <summary>
