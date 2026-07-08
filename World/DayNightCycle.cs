@@ -52,6 +52,19 @@ public class DayNightCycle
     /// <summary>0 in daylight, 1 in deep night — drives star visibility.</summary>
     public float StarAlpha { get; private set; }
 
+    /// <summary>Ever-increasing seconds since this session began — drives the
+    /// star-twinkle shimmer. Not wrapped and not persisted.</summary>
+    public float AnimationTime { get; private set; }
+
+    // Eight discrete lunar phases, like the reference game; advances one step
+    // each midnight. Session-scoped (not saved), and offset so the first night
+    // opens on a full moon rather than an invisible new moon.
+    private const int LunarPhases = 8;
+    private int _dayCount;
+
+    /// <summary>Lunar phase in [0,1): 0 and 1 are new moon, 0.5 is full.</summary>
+    public float MoonPhase => ((_dayCount + LunarPhases / 2) % LunarPhases) / (float)LunarPhases;
+
     /// <summary>Unit direction toward the sun: rises at +X, arcs overhead, sets at -X.</summary>
     public Vector3 SunDirection
     {
@@ -66,7 +79,14 @@ public class DayNightCycle
 
     public DayNightCycle() => Recalculate();
 
-    public void Update(float dt) => TimeOfDay = _timeOfDay + dt / DayLengthSeconds;
+    public void Update(float dt)
+    {
+        AnimationTime += dt;
+        float next = _timeOfDay + dt / DayLengthSeconds;
+        if (next >= 1f)
+            _dayCount++; // crossed midnight → next lunar phase
+        TimeOfDay = next; // setter wraps back into 0..1
+    }
 
     private void Recalculate()
     {

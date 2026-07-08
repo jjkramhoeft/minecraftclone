@@ -15,7 +15,7 @@ Minecraft itself as the reference.
       gate advanced recipes behind a crafting table block for progression texture.
 - [ ] Star twinkle + moon phases in `Rendering/SkyRenderer.cs`.
 - [x] No fall damage when starting (first fall from the heavens)
-- [ ] Debug Terrain Generator: Calculate block frequancy (run and show when F3 is pressed)
+- [x] Debug Terrain Generator: Calculate block frequancy (run and show when F3 is pressed)
 
 ## Future ideas (not ready yet)
 
