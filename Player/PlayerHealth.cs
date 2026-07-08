@@ -24,6 +24,7 @@ public class PlayerHealth
     public bool IsUnderwater { get; private set; }
 
     private float _drownTimer;
+    private bool _ignoreNextLanding = true;
 
     public event Action Died;
     public event Action<int> Damaged;
@@ -32,12 +33,21 @@ public class PlayerHealth
     {
         if (player.LandingImpact > 0f && !player.IsFlying)
         {
-            // Convert impact speed back to fall height (v² = 2gh); everything
-            // beyond the safe height hurts, one half-heart per block.
-            float fallBlocks = player.LandingImpact * player.LandingImpact / (2f * GravityMagnitude);
-            int damage = (int)MathF.Floor(fallBlocks - SafeFallBlocks);
-            if (damage > 0 && !FeetInWater(player, world))
-                Damage(damage);
+            // The player spawns high above the terrain and free-falls once the
+            // spawn chunk loads; that first landing from the heavens is a freebie.
+            if (_ignoreNextLanding)
+            {
+                _ignoreNextLanding = false;
+            }
+            else
+            {
+                // Convert impact speed back to fall height (v² = 2gh); everything
+                // beyond the safe height hurts, one half-heart per block.
+                float fallBlocks = player.LandingImpact * player.LandingImpact / (2f * GravityMagnitude);
+                int damage = (int)MathF.Floor(fallBlocks - SafeFallBlocks);
+                if (damage > 0 && !FeetInWater(player, world))
+                    Damage(damage);
+            }
         }
 
         var eye = player.EyePosition;
@@ -78,6 +88,7 @@ public class PlayerHealth
         Health = MaxHealth;
         Air = MaxAir;
         _drownTimer = 0f;
+        _ignoreNextLanding = true; // respawn also drops from the heavens
     }
 
     private static bool FeetInWater(PlayerController player, ChunkManager world) =>
