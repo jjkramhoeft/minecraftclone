@@ -20,14 +20,14 @@ The whole game is plain C# on top of MonoGame's rendering primitives: chunk mesh
 - **Smelting**: furnaces turn iron ore into ingots and sand into glass, burning coal as fuel and glowing while lit
 - **Storage**: place chests for 12 extra slots of storage that persist with the world
 - **Buckets & flowing water**: scoop a water source into a bucket and pour it back out; water spreads, falls, and drains as a self-correcting cellular automaton, and two adjacent sources refill between them
-- **Torches & block lighting**: place torches (and lit furnaces) that cast a smooth per-vertex glow, keeping their surroundings bright after dark
+- **Torches & block lighting**: caves and enclosed spaces stay dark day or night, so torches (and lit furnaces) are your main underground light — they cast a smooth per-vertex glow that keeps their surroundings bright
 - **Passive mobs**: pigs and chickens wander, hop over ledges, and paddle in water — up to ten around you at a time
-- **A visible player character**: an animated blocky figure — you see its arm swing in first person and the whole walking (and sneaking) body in third person
+- **A visible player character**: an animated blocky figure — you see its arm swing in first person (holding the equipped tool or bucket) and the whole walking (and sneaking) body in third person
 - **Dual camera**: first-person or over-the-shoulder third person (`V`), with the camera boom pulling in so terrain never occludes the view
 - **Pixel-style textures** from a procedurally generated 256×256 atlas — and you can override any tile by dropping a 16×16 PNG into a `textures/` folder
 - **Synthesized sound**: footsteps, digging, placing, splashes, and pickups, all generated from noise at startup — no audio files
-- **Lighting look** from per-face directional shading, per-vertex ambient occlusion, and torch block-light
-- **Day/night cycle** (10-minute days): the sky shifts through sunrise, noon, sunset, and night; a sun and phased moon cross the sky, 150 stars come out after dark, and the world dims to a moonlit floor
+- **Lighting look** from per-face directional shading, per-vertex ambient occlusion, a vertical sky-light channel (so caves go dark), and torch block-light
+- **Day/night cycle** (10-minute days): the sky shifts through sunrise, noon, sunset, and night; a sun and phased moon cross the sky, 150 stars come out after dark (hidden where clouds cover them), and the world dims to a moonlit floor
 - **Sky & weather dressing**: drifting clouds, distance fog blending the horizon into the sky, and water splash/bubble particles
 - **Persistent worlds**: three save slots with a main menu and pause menu; your edits, position, inventory (including tool wear), furnaces, chests, and time of day all survive restarts
 
@@ -88,7 +88,7 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 |---|---|
 | `BlockType.cs` | The block palette: a `byte`-backed enum — terrain, plants, ores, water source/flow/fall variants, torches, furnaces, glass, chests, crafting tables, and tree-species logs/leaves |
 | `BlockInfo.cs` | Per-block properties: solidity, opacity, hardness, effective tool, required tool tier, light emission, gravity, and which atlas tile each face uses |
-| `Chunk.cs` | Storage for one 16×128×16 column of blocks — a flat `byte[]` plus a per-cell light array, with dirty/modified flags |
+| `Chunk.cs` | Storage for one 16×128×16 column of blocks — a flat `byte[]` plus per-cell block-light and sky-light arrays, with dirty/modified flags |
 | `ChunkCoord.cs` | A chunk's position in the 2D chunk grid |
 | `ChunkManager.cs` | The heart of the world: streams chunks in and out around the player, schedules background generation/meshing, and exposes `GetBlock`/`SetBlock` in world coordinates — the single block API used by rendering, physics, and raycasting |
 | `TerrainGenerator.cs` | Fills chunks deterministically from the seed: fBm heightmap, three biomes, stone/dirt/grass strata, sandy lowlands, valley-filled lakes, spaghetti caves, coal/iron ore blobs, oak/birch/pine trees, ferns, flowers, and shoreline reeds |
@@ -172,11 +172,11 @@ Single executable project; namespaces mirror folders. [MainGame.cs](MainGame.cs)
 
 The choices that shape the code, written down so future-me doesn't relitigate them:
 
-- **Column chunks, 16×128×16**, keyed by `(X, Z)` in a 2D grid. Block data is a flat `byte[]` per chunk (plus a light array) — no palette compression, no bit-packing; it's pointless at this scale.
+- **Column chunks, 16×128×16**, keyed by `(X, Z)` in a 2D grid. Block data is a flat `byte[]` per chunk (plus block-light and sky-light arrays) — no palette compression, no bit-packing; it's pointless at this scale.
 - **Greedy meshing.** Coplanar faces with uniform tile, ambient occlusion, and torch light merge into large quads; faces with corner gradients stay 1×1 so the result is pixel-identical to naive culled meshing where it matters. Meshing splits into an opaque pass, a transparent water pass, an alpha-test cutout pass (plants and glass), and an emissive light overlay.
 - **Threading rule:** worker threads generate block data and build vertex arrays; **only the main thread touches the GraphicsDevice**, uploading a few finished meshes per frame from a queue. A chunk is meshed only once its 3×3 neighborhood has block data (AO samples diagonal neighbors), so borders are always seamless.
 - **Block edits remesh synchronously** on the main thread so breaking/placing feels instant.
-- **Lighting is two cheap channels, not a full engine.** A fixed per-face directional shade plus per-vertex ambient occlusion gives the base look; torch/furnace block-light propagates through a light array and is max-blended over the day-lit pass so lit surfaces stay bright at night. There is no separately propagated skylight channel.
+- **Lighting is a few cheap channels, not a full engine.** A fixed per-face directional shade plus per-vertex ambient occlusion gives the base look. A vertical-only sky-light channel (sun straight down each column, stopped by the first opaque block) is baked into vertex brightness and scaled by the day tint, so caves stay dark at noon. Torch/furnace block-light propagates through its own array and is max-blended over the day-lit pass, so lit surfaces — and underground torches — stay bright. Sky-light does not spread sideways, so enclosed rooms need torches even with a window.
 - **Water is a self-verifying automaton.** Each disturbed cell recomputes its own state from its neighbors, so flows spread, fall, and drain toward a stable configuration without a global solver, and freeze cleanly at unloaded-chunk borders.
 - **Everything is generated in code** at startup — the texture atlas (with optional PNG overrides) and every sound effect. No art assets, no audio files, and no MonoGame content pipeline (MGCB) involvement.
 - **Only player-modified chunks are saved.** Everything else — terrain, ores, trees, mobs, item drops — regenerates or respawns; mobs and drops are deliberately ambient and never persisted.
