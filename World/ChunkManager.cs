@@ -122,6 +122,7 @@ public class ChunkManager : IDisposable
         chunk.Version++;
 
         UpdateLightForEdit(chunk, x, y, z, oldType, type);
+        chunk.RecomputeSkyColumn(localX, localZ);
         RemeshNow(coord);
         // A border edit changes the neighbor's face culling too.
         if (localX == 0) RemeshNow(new ChunkCoord(coord.X - 1, coord.Z));
@@ -153,6 +154,7 @@ public class ChunkManager : IDisposable
         chunk.MeshDirty = true;
 
         UpdateLightForEdit(chunk, x, y, z, oldType, type);
+        chunk.RecomputeSkyColumn(localX, localZ);
 
         // A border edit changes the neighbor's face culling too.
         if (localX == 0) MarkMeshDirty(new ChunkCoord(coord.X - 1, coord.Z));
@@ -178,7 +180,7 @@ public class ChunkManager : IDisposable
             return;
         }
 
-        var data = ChunkMesher.Build(chunk, neighbors.Sample, neighbors.SampleLight);
+        var data = ChunkMesher.Build(chunk, neighbors.Sample, neighbors.SampleLight, neighbors.SampleSkyLight);
         if (_meshes.Remove(coord, out var oldMesh))
             oldMesh.Dispose();
         _meshes[coord] = new ChunkMesh(_device, coord, data);
@@ -391,6 +393,7 @@ public class ChunkManager : IDisposable
                         ScanEmitters(chunk); // saved chunks may contain torches
                     else
                         _generator.Generate(chunk);
+                    chunk.ComputeSkyLight(); // derived; off the main thread here
                     _generatedChunks.Enqueue(chunk);
                 });
             }
@@ -406,7 +409,7 @@ public class ChunkManager : IDisposable
                 int version = loaded.Version;
                 Task.Run(() =>
                 {
-                    var data = ChunkMesher.Build(loaded, neighbors.Sample, neighbors.SampleLight);
+                    var data = ChunkMesher.Build(loaded, neighbors.Sample, neighbors.SampleLight, neighbors.SampleSkyLight);
                     _meshResults.Enqueue((loaded.Coord, version, data));
                 });
             }
@@ -504,6 +507,15 @@ public class ChunkManager : IDisposable
             int gridX = (x + Chunk.SizeX) >> 4;
             int gridZ = (z + Chunk.SizeZ) >> 4;
             return _grid[gridX + gridZ * 3].GetLight(x & 15, y, z & 15);
+        }
+
+        public byte SampleSkyLight(int x, int y, int z)
+        {
+            if (y < 0) return 0;
+            if (y >= Chunk.SizeY) return 15; // open sky above the world top
+            int gridX = (x + Chunk.SizeX) >> 4;
+            int gridZ = (z + Chunk.SizeZ) >> 4;
+            return _grid[gridX + gridZ * 3].GetSkyLight(x & 15, y, z & 15);
         }
     }
 

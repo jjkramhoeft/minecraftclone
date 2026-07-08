@@ -29,6 +29,7 @@ public class Chunk
 
     private readonly byte[] _blocks = new byte[SizeX * SizeY * SizeZ];
     private readonly byte[] _light = new byte[SizeX * SizeY * SizeZ];
+    private readonly byte[] _skyLight = new byte[SizeX * SizeY * SizeZ];
 
     /// <summary>Raw block storage — exposed for save/load serialization only.</summary>
     public byte[] Blocks => _blocks;
@@ -52,6 +53,34 @@ public class Chunk
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetLight(int x, int y, int z, byte level) => _light[Index(x, y, z)] = level;
+
+    /// <summary>Sky light 0-15, derived at runtime from the block column (sun
+    /// straight down, stopped by the first opaque block) — never saved.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public byte GetSkyLight(int x, int y, int z) => _skyLight[Index(x, y, z)];
+
+    /// <summary>Recomputes sky light for every column. Vertical-only: full sky
+    /// (15) from the top until the first block that blocks sky, then 0 all the
+    /// way down. Cheap and self-contained, so it runs on the load/gen worker.</summary>
+    public void ComputeSkyLight()
+    {
+        for (int z = 0; z < SizeZ; z++)
+            for (int x = 0; x < SizeX; x++)
+                RecomputeSkyColumn(x, z);
+    }
+
+    /// <summary>Recomputes one column after an edit — the only cells whose sky
+    /// light a block change in that column can affect.</summary>
+    public void RecomputeSkyColumn(int x, int z)
+    {
+        byte level = 15;
+        for (int y = SizeY - 1; y >= 0; y--)
+        {
+            if (BlockInfo.BlocksSkyLight((BlockType)_blocks[Index(x, y, z)]))
+                level = 0;
+            _skyLight[Index(x, y, z)] = level;
+        }
+    }
 
     public static bool InBounds(int x, int y, int z) =>
         x >= 0 && x < SizeX && y >= 0 && y < SizeY && z >= 0 && z < SizeZ;

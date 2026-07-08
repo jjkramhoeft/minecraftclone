@@ -81,7 +81,17 @@ public static class ChunkMesher
     // Brightness per ambient-occlusion level (0 = fully occluded corner).
     private static readonly float[] AoFactor = { 0.55f, 0.7f, 0.85f, 1f };
 
+    // Day-light reaching a cell in full shadow (sky light 0). Kept just above
+    // zero so caves read as dark-but-navigable rather than pitch black; torch
+    // light max-blends on top in its own pass.
+    private const float SkyDarkFloor = 0.06f;
+
     private const byte WaterAlpha = 160;
+
+    /// <summary>Fraction of the day tint a cell receives for its sky light
+    /// level (0-15): SkyDarkFloor in full shadow, 1 under open sky.</summary>
+    private static float SkyFactor(byte skyLevel) =>
+        SkyDarkFloor + (1f - SkyDarkFloor) * (skyLevel / 15f);
 
     /// <summary>One cell of the greedy mask. Kind classifies how the face's
     /// corner lighting varies, which decides the directions it may merge in
@@ -97,11 +107,13 @@ public static class ChunkMesher
         public ushort Tile;
         public byte AoPacked;     // 4 corners x 2 bits
         public uint TorchPacked;  // 4 corners x 8 bits
+        public ushort SkyPacked;  // 4 corners x 4 bits
     }
 
     private static bool SameCell(in MaskCell a, in MaskCell b) =>
         a.Kind == b.Kind && a.Tile == b.Tile
-        && a.AoPacked == b.AoPacked && a.TorchPacked == b.TorchPacked;
+        && a.AoPacked == b.AoPacked && a.TorchPacked == b.TorchPacked
+        && a.SkyPacked == b.SkyPacked;
 
     private static int AxisSize(int axis) =>
         axis == 0 ? Chunk.SizeX : axis == 1 ? Chunk.SizeY : Chunk.SizeZ;
@@ -112,8 +124,9 @@ public static class ChunkMesher
     /// resolve all 8 surrounding chunks (AO samples diagonals).
     /// </param>
     /// <param name="getOutsideLight">Block-light sampler with the same contract.</param>
+    /// <param name="getOutsideSky">Sky-light sampler with the same contract.</param>
     public static MeshData Build(Chunk chunk, Func<int, int, int, BlockType> getOutsideBlock,
-        Func<int, int, int, byte> getOutsideLight)
+        Func<int, int, int, byte> getOutsideLight, Func<int, int, int, byte> getOutsideSky)
     {
         var vertices = new List<TerrainVertex>();
         var indices = new List<int>();
@@ -128,6 +141,8 @@ public static class ChunkMesher
             Chunk.InBounds(x, y, z) ? chunk.GetBlock(x, y, z) : getOutsideBlock(x, y, z);
         byte SampleLight(int x, int y, int z) =>
             Chunk.InBounds(x, y, z) ? chunk.GetLight(x, y, z) : getOutsideLight(x, y, z);
+        byte SampleSky(int x, int y, int z) =>
+            Chunk.InBounds(x, y, z) ? chunk.GetSkyLight(x, y, z) : getOutsideSky(x, y, z);
 
         // Pass 1: the per-block special cases (plants, water, glass).
         for (int y = 0; y < Chunk.SizeY; y++)
@@ -143,8 +158,10 @@ public static class ChunkMesher
                     if (BlockInfo.IsPlant(type))
                     {
                         // Plants are crossed quads in the cutout pass — no
-                        // faces, no culling, no AO, no neighbor reads.
-                        AddCrossQuads(cutoutVertices, cutoutIndices, x, y, z, type, Color.White);
+                        // faces, no culling, no AO, no neighbor reads. Sky light
+                        // (baked into the tint) darkens plants underground.
+                        byte pb = (byte)(255 * SkyFactor(SampleSky(x, y, z)));
+                        AddCrossQuads(cutoutVertices, cutoutIndices, x, y, z, type, new Color(pb, pb, pb));
                         // Emitters glow: the same quads at full brightness in
                         // the max-blended light pass keep them bright at night.
                         if (BlockInfo.GetLightEmission(type) > 0)
@@ -154,7 +171,8 @@ public static class ChunkMesher
 
                     if (BlockInfo.IsWater(type))
                     {
-                        AddWaterBlock(waterVertices, waterIndices, x, y, z, type, Sample);
+                        AddWaterBlock(waterVertices, waterIndices, x, y, z, type, Sample,
+                            SkyFactor(SampleSky(x, y, z)));
                         continue;
                     }
 
@@ -169,7 +187,7 @@ public static class ChunkMesher
                             var neighbor = Sample(x + nx, y + ny, z + nz);
                             if (!BlockInfo.IsOpaque(neighbor) && neighbor != BlockType.Glass)
                                 AddGlassFace(cutoutVertices, cutoutIndices, lightVertices, lightIndices,
-                                    x, y, z, face, type, Sample, SampleLight);
+                                    x, y, z, face, type, Sample, SampleLight, SampleSky);
                         }
                     }
                 }
@@ -181,6 +199,7 @@ public static class ChunkMesher
         var mask = new MaskCell[Chunk.SizeX * Chunk.SizeY]; // sized for the largest slice
         Span<int> ao = stackalloc int[4];
         Span<byte> torch = stackalloc byte[4];
+        Span<byte> sky = stackalloc byte[4];
 
         for (int face = 0; face < 6; face++)
         {
@@ -212,14 +231,16 @@ public static class ChunkMesher
                         if (BlockInfo.IsOpaque(neighbor))
                             continue;
 
-                        CornerLighting(x, y, z, face, Sample, SampleLight, ao, torch);
+                        CornerLighting(x, y, z, face, Sample, SampleLight, SampleSky, ao, torch, sky);
                         int tile = BlockInfo.GetFaceTile(type, (BlockFace)face);
 
                         // Corners: 0=BL, 1=BR, 2=TR, 3=TL in texture space.
                         bool uConst = ao[0] == ao[1] && ao[3] == ao[2]
-                            && torch[0] == torch[1] && torch[3] == torch[2];
+                            && torch[0] == torch[1] && torch[3] == torch[2]
+                            && sky[0] == sky[1] && sky[3] == sky[2];
                         bool vConst = ao[0] == ao[3] && ao[1] == ao[2]
-                            && torch[0] == torch[3] && torch[1] == torch[2];
+                            && torch[0] == torch[3] && torch[1] == torch[2]
+                            && sky[0] == sky[3] && sky[1] == sky[2];
                         byte kind = uConst && vConst ? MaskCell.Uniform
                             : uConst ? MaskCell.UConst
                             : vConst ? MaskCell.VConst
@@ -230,7 +251,7 @@ public static class ChunkMesher
                             // Lighting varies in both directions — merging
                             // would visibly change the gradient. Emit as-is.
                             EmitFace(vertices, indices, lightVertices, lightIndices,
-                                face, x, y, z, 1, 1, tile, ao, torch);
+                                face, x, y, z, 1, 1, tile, ao, torch, sky);
                         }
                         else
                         {
@@ -240,6 +261,7 @@ public static class ChunkMesher
                                 Tile = (ushort)tile,
                                 AoPacked = (byte)(ao[0] | ao[1] << 2 | ao[2] << 4 | ao[3] << 6),
                                 TorchPacked = (uint)(torch[0] | torch[1] << 8 | torch[2] << 16 | torch[3] << 24),
+                                SkyPacked = (ushort)(sky[0] | sky[1] << 4 | sky[2] << 8 | sky[3] << 12),
                             };
                             any = true;
                         }
@@ -279,9 +301,10 @@ public static class ChunkMesher
                         {
                             ao[c] = (cell.AoPacked >> (2 * c)) & 3;
                             torch[c] = (byte)(cell.TorchPacked >> (8 * c));
+                            sky[c] = (byte)((cell.SkyPacked >> (4 * c)) & 15);
                         }
                         EmitFace(vertices, indices, lightVertices, lightIndices,
-                            face, x, y, z, width, height, cell.Tile, ao, torch);
+                            face, x, y, z, width, height, cell.Tile, ao, torch, sky);
 
                         i += width - 1;
                     }
@@ -320,7 +343,7 @@ public static class ChunkMesher
     /// out along the face normal.</summary>
     private static void CornerLighting(int bx, int by, int bz, int face,
         Func<int, int, int, BlockType> sample, Func<int, int, int, byte> sampleLight,
-        Span<int> ao, Span<byte> torch)
+        Func<int, int, int, byte> sampleSky, Span<int> ao, Span<byte> torch, Span<byte> sky)
     {
         var (nx, ny, nz) = FaceNormals[face];
         var (uAxis, vAxis) = FaceTangents[face];
@@ -348,6 +371,14 @@ public static class ChunkMesher
                 + sampleLight(side2.X, side2.Y, side2.Z)
                 + sampleLight(corner.X, corner.Y, corner.Z);
             torch[i] = (byte)(light / 4);
+
+            // Smooth sky light the same way (solid cells hold 0, so a face
+            // tucked under an overhang darkens toward the shadowed corner).
+            int skySum = sampleSky(front.Item1, front.Item2, front.Item3)
+                + sampleSky(side1.X, side1.Y, side1.Z)
+                + sampleSky(side2.X, side2.Y, side2.Z)
+                + sampleSky(corner.X, corner.Y, corner.Z);
+            sky[i] = (byte)(skySum / 4);
         }
     }
 
@@ -357,7 +388,7 @@ public static class ChunkMesher
     private static void EmitFace(List<TerrainVertex> vertices, List<int> indices,
         List<TerrainVertex> lightVertices, List<int> lightIndices,
         int face, int bx, int by, int bz, int width, int height, int tile,
-        ReadOnlySpan<int> ao, ReadOnlySpan<byte> torch)
+        ReadOnlySpan<int> ao, ReadOnlySpan<byte> torch, ReadOnlySpan<byte> sky)
     {
         var (_, pAxis, qAxis) = FaceSliceAxes[face];
         Span<float> extent = stackalloc float[] { 1f, 1f, 1f };
@@ -381,7 +412,9 @@ public static class ChunkMesher
             locals[i] = new Vector2(CornerCu[i] * width, CornerCv[i] * height);
             maxTorch = Math.Max(maxTorch, torch[i]);
 
-            byte brightness = (byte)(255 * shade * AoFactor[ao[i]]);
+            // Sky light baked into the vertex tint: the shader multiplies this
+            // by the per-frame day colour, so shadowed faces stay dark at noon.
+            byte brightness = (byte)(255 * shade * AoFactor[ao[i]] * SkyFactor(sky[i]));
             vertices.Add(new TerrainVertex(positions[i],
                 new Color(brightness, brightness, brightness), locals[i], origin));
         }
@@ -469,7 +502,8 @@ public static class ChunkMesher
     private static void AddGlassFace(List<VertexPositionColorTexture> vertices, List<int> indices,
         List<TerrainVertex> lightVertices, List<int> lightIndices,
         int bx, int by, int bz, int face, BlockType type,
-        Func<int, int, int, BlockType> sample, Func<int, int, int, byte> sampleLight)
+        Func<int, int, int, BlockType> sample, Func<int, int, int, byte> sampleLight,
+        Func<int, int, int, byte> sampleSky)
     {
         float shade = FaceShade[face];
         var uv = TextureAtlas.GetUVBounds(BlockInfo.GetFaceTile(type, (BlockFace)face));
@@ -480,7 +514,8 @@ public static class ChunkMesher
 
         Span<int> ao = stackalloc int[4];
         Span<byte> torch = stackalloc byte[4];
-        CornerLighting(bx, by, bz, face, sample, sampleLight, ao, torch);
+        Span<byte> sky = stackalloc byte[4];
+        CornerLighting(bx, by, bz, face, sample, sampleLight, sampleSky, ao, torch, sky);
 
         var blockPos = new Vector3(bx, by, bz);
         var corners = FaceCorners[face];
@@ -489,7 +524,7 @@ public static class ChunkMesher
         for (int i = 0; i < 4; i++)
         {
             maxTorch = Math.Max(maxTorch, torch[i]);
-            byte brightness = (byte)(255 * shade * AoFactor[ao[i]]);
+            byte brightness = (byte)(255 * shade * AoFactor[ao[i]] * SkyFactor(sky[i]));
             vertices.Add(new VertexPositionColorTexture(
                 blockPos + corners[i], new Color(brightness, brightness, brightness), uvs[i]));
         }
@@ -556,7 +591,7 @@ public static class ChunkMesher
     }
 
     private static void AddWaterBlock(List<VertexPositionColorTexture> vertices, List<int> indices,
-        int bx, int by, int bz, BlockType type, Func<int, int, int, BlockType> sample)
+        int bx, int by, int bz, BlockType type, Func<int, int, int, BlockType> sample, float skyFactor)
     {
         var above = sample(bx, by + 1, bz);
         float myHeight = WaterHeight(type, above);
@@ -588,7 +623,7 @@ public static class ChunkMesher
             {
                 // Water above/below makes the face interior.
                 if (!BlockInfo.IsWater(neighbor))
-                    AddWaterFace(vertices, indices, bx, by, bz, face, 0f, tops);
+                    AddWaterFace(vertices, indices, bx, by, bz, face, 0f, tops, skyFactor);
                 continue;
             }
 
@@ -598,14 +633,14 @@ public static class ChunkMesher
                 ? WaterHeight(neighbor, sample(bx + nx, by + 1, bz + nz))
                 : 0f;
             if (myHeight > neighborHeight)
-                AddWaterFace(vertices, indices, bx, by, bz, face, neighborHeight, tops);
+                AddWaterFace(vertices, indices, bx, by, bz, face, neighborHeight, tops, skyFactor);
         }
     }
 
     private static void AddWaterFace(List<VertexPositionColorTexture> vertices, List<int> indices,
-        int bx, int by, int bz, int face, float yBottom, ReadOnlySpan<float> tops)
+        int bx, int by, int bz, int face, float yBottom, ReadOnlySpan<float> tops, float skyFactor)
     {
-        byte shade = (byte)(255 * FaceShade[face]);
+        byte shade = (byte)(255 * FaceShade[face] * skyFactor);
         var color = new Color(shade, shade, shade, WaterAlpha);
         var uv = TextureAtlas.GetUVBounds(BlockInfo.TileWater);
         var blockPos = new Vector3(bx, by, bz);

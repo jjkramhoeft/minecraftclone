@@ -100,6 +100,15 @@ public static class BlockInfo
     public static bool IsOpaque(BlockType type) =>
         IsSolid(type) && type != BlockType.Glass;
 
+    public static bool IsLeaves(BlockType type) =>
+        type is BlockType.Leaves or BlockType.BirchLeaves or BlockType.PineLeaves;
+
+    /// <summary>Stops sunlight travelling straight down a column (vertical-only
+    /// skylight). Opaque solids block it; glass, water, plants and — so forest
+    /// floors stay lit — leaves let it pass.</summary>
+    public static bool BlocksSkyLight(BlockType type) =>
+        IsOpaque(type) && !IsLeaves(type);
+
     /// <summary>Blocks that respond to right-click instead of being built against.</summary>
     public static bool IsInteractable(BlockType type) =>
         type is BlockType.Furnace or BlockType.FurnaceLit or BlockType.Chest or BlockType.CraftingTable;
