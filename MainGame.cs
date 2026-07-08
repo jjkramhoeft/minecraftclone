@@ -39,6 +39,7 @@ public class MainGame : Game
     private InventoryScreen _inventoryScreen;
     private PixelFont _font;
     private GameSounds _sounds;
+    private PlayerHealth _health;
 
     // Footstep/splash state, driven from player movement each frame.
     private Vector3 _lastStepPosition;
@@ -121,6 +122,8 @@ public class MainGame : Game
         _playerModel = new PlayerModel(GraphicsDevice, _atlas);
         _sounds = new GameSounds();
         WireInteractionEvents();
+        _health = new PlayerHealth();
+        _health.Died += RespawnPlayer;
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
@@ -164,6 +167,7 @@ public class MainGame : Game
                 _hotbar.Update(keyboard, mouse);
             _blockInteraction.Update(_camera, mouse, _previousMouse, IsActive && _mouseCaptured, dt);
             UpdateMovementSounds();
+            _health.Update(_player, _chunkManager, dt);
         }
         _chunkManager.Update(_player.Position);
         _blockUpdater.Update(_chunkManager, _fallingBlocks, dt);
@@ -206,11 +210,20 @@ public class MainGame : Game
 
         // Hotbar and InventoryScreen hold the inventory reference — clear in place.
         _inventory.Clear();
+        _health.Reset();
         _camera.Yaw = 0f;
         _camera.Pitch = 0f;
         _dayNight.TimeOfDay = 0.1f;
 
         SaveWorld(); // pin the new seed to disk immediately
+    }
+
+    /// <summary>Death is gentle for now: back to the world spawn with full
+    /// vitals, inventory intact.</summary>
+    private void RespawnPlayer()
+    {
+        _player.Teleport(new Vector3(8.5f, 70f, 8.5f));
+        _health.Reset();
     }
 
     private void WireInteractionEvents()
@@ -374,7 +387,7 @@ public class MainGame : Game
             _playerModel.DrawFirstPersonArm(_camera);
 
         if (!_inventoryScreen.IsOpen)
-            _hud.Draw(_spriteBatch, width, height);
+            _hud.Draw(_spriteBatch, _health, width, height);
         _hotbar.Draw(_spriteBatch, _atlas, _font, width, height);
         if (_inventoryScreen.IsOpen)
             _inventoryScreen.Draw(_spriteBatch, _atlas, _font, Mouse.GetState(), width, height);

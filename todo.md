@@ -36,7 +36,7 @@ Minecraft itself as the reference.
       `Rendering/TextureAtlas.cs`), generate sounds procedurally into
       `SoundEffect.FromStream`/`new SoundEffect(buffer,...)`: noise-burst dig/place per
       material, splash, footsteps. Even 5 crude sounds transform the feel.
-- [ ] **Health, fall damage, drowning, respawn.** The survival foundation every
+- [x] **Health, fall damage, drowning, respawn.** The survival foundation every
       comparison target has. Hearts on the HUD (`UI/Hud.cs`), fall damage from impact
       velocity in `Player/PlayerPhysics.cs` (velocity is already known at landing),
       air meter while the eye cell is water, death → respawn at spawn point, keep it

@@ -37,6 +37,10 @@ public class PlayerController
 
     public Vector3 EyePosition => Position + new Vector3(0f, EyeHeight, 0f);
 
+    /// <summary>Downward speed at the moment of the latest landing, 0 while
+    /// airborne or after a soft touchdown — read by fall damage.</summary>
+    public float LandingImpact { get; private set; }
+
     public PlayerController(Vector3 spawnPosition, bool isFlying = false)
     {
         Position = spawnPosition;
@@ -97,6 +101,18 @@ public class PlayerController
             }
         }
 
+        bool wasOnGround = IsOnGround;
+        float fallSpeed = -Velocity.Y;
         IsOnGround = PlayerPhysics.MoveWithCollision(ref Position, ref Velocity, world, dt, out _againstWall);
+        LandingImpact = !wasOnGround && IsOnGround && fallSpeed > 0f ? fallSpeed : 0f;
+    }
+
+    /// <summary>Respawn/teleport: moves the feet and kills all momentum.</summary>
+    public void Teleport(Vector3 position)
+    {
+        Position = position;
+        Velocity = Vector3.Zero;
+        IsOnGround = false;
+        LandingImpact = 0f;
     }
 }
