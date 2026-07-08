@@ -84,14 +84,20 @@ public class MainGame : Game
     // world, prints a machine-readable summary to stdout, and exits without
     // touching the real save. Lets tooling verify a change without screenshots.
     private readonly bool _smoke;
+
+    // Dump mode (--dump-textures): builds the atlas, writes each generated tile
+    // out as a PNG into TextureAtlas.OverrideFolder, then exits. Gives a baseline
+    // to edit; dropped-in PNGs then override the generated tiles at load.
+    private readonly bool _dumpTextures;
     private const int SmokeUpdateFrames = 180; // ~3 s at the fixed 60 Hz step
     private int _smokeUpdates;
     private int _smokeDraws;
     private double _smokeElapsed;
 
-    public MainGame(bool smoke = false)
+    public MainGame(bool smoke = false, bool dumpTextures = false)
     {
         _smoke = smoke;
+        _dumpTextures = dumpTextures;
         _graphics = new GraphicsDeviceManager(this);
         _graphics.PreferredBackBufferWidth = 1280;
         _graphics.PreferredBackBufferHeight = 720;
@@ -108,6 +114,9 @@ public class MainGame : Game
         _dayNight = new DayNightCycle();
 
         base.Initialize(); // runs LoadContent
+
+        if (_dumpTextures)
+            return; // LoadContent dumped the atlas and requested Exit(); skip world/menu setup
 
         if (_smoke)
             StartWorld("smoke");
@@ -223,6 +232,12 @@ public class MainGame : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _atlas = new TextureAtlas(GraphicsDevice);
+        if (_dumpTextures)
+        {
+            TextureAtlas.DumpTiles(GraphicsDevice, TextureAtlas.OverrideFolder);
+            Exit();
+            return;
+        }
         _worldRenderer = new WorldRenderer(GraphicsDevice, _atlas, Content.Load<Effect>("TerrainEffect"));
         _blockHighlight = new BlockHighlight(GraphicsDevice);
         _breakingOverlay = new BreakingOverlay(GraphicsDevice, _atlas);
@@ -265,6 +280,8 @@ public class MainGame : Game
 
     protected override void Update(GameTime gameTime)
     {
+        if (_dumpTextures) return; // dumped in LoadContent; Exit() is pending
+
         var keyboard = Keyboard.GetState();
         var mouse = Mouse.GetState();
 
@@ -589,6 +606,8 @@ public class MainGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        if (_dumpTextures) return; // dumped in LoadContent; Exit() is pending
+
         GraphicsDevice.Clear(_dayNight.SkyColor);
 
         int width = GraphicsDevice.Viewport.Width, height = GraphicsDevice.Viewport.Height;

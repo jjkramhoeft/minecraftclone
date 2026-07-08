@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using MinecraftClone.World;
@@ -6,11 +7,12 @@ using MinecraftClone.World;
 namespace MinecraftClone.Rendering;
 
 /// <summary>
-/// The block texture atlas, generated procedurally at startup: a 16x16 grid of
-/// 16x16-pixel tiles (256x256 total), each a base color with deterministic
-/// per-pixel brightness jitter — the classic voxel-game speckle. No image
-/// assets, no content pipeline. Swapping in a real atlas.png later only means
-/// replacing this generation with Texture2D.FromStream.
+/// The block texture atlas: a 16x16 grid of 16x16-pixel tiles (256x256 total).
+/// Each tile is generated procedurally at startup — a base color with
+/// deterministic per-pixel brightness jitter, the classic voxel-game speckle —
+/// but any tile can be overridden by dropping a matching 16x16 PNG into the
+/// <c>textures/</c> folder (see <see cref="ApplyOverrides"/>). Run the game with
+/// <c>--dump-textures</c> to export the generated tiles as PNGs to edit.
 /// </summary>
 public class TextureAtlas
 {
@@ -18,9 +20,42 @@ public class TextureAtlas
     public const int TilesPerRow = 16;
     public const int AtlasSize = TileSize * TilesPerRow;
 
+    /// <summary>Folder (relative to the working directory, like <c>saves/</c>)
+    /// scanned for per-tile PNG overrides and written to by --dump-textures.</summary>
+    public const string OverrideFolder = "textures";
+
+    /// <summary>File name (without extension) for each tile, indexed by tile.
+    /// A tile whose PNG exists in <see cref="OverrideFolder"/> loads from disk
+    /// instead of using its generated pixels. Order matches BlockInfo.Tile*.</summary>
+    private static readonly string[] TileNames =
+    {
+        "grass_top", "grass_side", "dirt", "stone", "sand",
+        "wood_side", "wood_top", "leaves", "water", "planks",
+        "bricks", "stick", "wooden_pickaxe", "stone_pickaxe", "wooden_axe",
+        "stone_axe", "wooden_shovel", "stone_shovel", "crack_0", "crack_1",
+        "crack_2", "crack_3", "flower_red", "flower_yellow", "flower_poppy",
+        "skin", "shirt", "pants", "face", "reeds",
+        "sun", "moon", "coal_ore", "iron_ore", "iron_pickaxe",
+        "iron_axe", "iron_shovel", "coal", "iron_ingot", "torch",
+        "pig", "chicken", "furnace_side", "furnace_front", "furnace_front_lit",
+        "glass", "chest_side", "chest_front", "bucket", "water_bucket",
+        "crafting_top", "crafting_side", "birch_bark", "birch_top", "birch_leaves",
+        "pine_bark", "pine_top", "pine_leaves", "fern", "cobblestone",
+    };
+
     public Texture2D Texture { get; }
 
     public TextureAtlas(GraphicsDevice device)
+    {
+        var pixels = GenerateTiles();
+        ApplyOverrides(device, pixels);
+        Texture = new Texture2D(device, AtlasSize, AtlasSize);
+        Texture.SetData(pixels);
+    }
+
+    /// <summary>Builds the full atlas buffer from the procedural generators, with
+    /// no file overrides applied — the pristine baseline used by --dump-textures.</summary>
+    private static Color[] GenerateTiles()
     {
         var pixels = new Color[AtlasSize * AtlasSize];
 
@@ -85,8 +120,75 @@ public class TextureAtlas
         DrawFern(pixels);
         DrawCobblestone(pixels);
 
-        Texture = new Texture2D(device, AtlasSize, AtlasSize);
-        Texture.SetData(pixels);
+        return pixels;
+    }
+
+    /// <summary>Replaces individual tiles with pixels loaded from
+    /// <c>{OverrideFolder}/{name}.png</c> when such a file exists. Missing folder
+    /// or files leave the generated tiles untouched; a bad or wrong-sized PNG is
+    /// skipped with a warning rather than crashing startup.</summary>
+    private static void ApplyOverrides(GraphicsDevice device, Color[] pixels)
+    {
+        if (!Directory.Exists(OverrideFolder))
+            return;
+
+        var tilePixels = new Color[TileSize * TileSize];
+        for (int tile = 0; tile < TileNames.Length; tile++)
+        {
+            string path = Path.Combine(OverrideFolder, TileNames[tile] + ".png");
+            if (!File.Exists(path))
+                continue;
+
+            try
+            {
+                using var stream = File.OpenRead(path);
+                using var loaded = Texture2D.FromStream(device, stream);
+                if (loaded.Width != TileSize || loaded.Height != TileSize)
+                {
+                    Console.WriteLine(
+                        $"Texture override {path} is {loaded.Width}x{loaded.Height}, expected {TileSize}x{TileSize} — skipping.");
+                    continue;
+                }
+
+                loaded.GetData(tilePixels);
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                        SetPixel(pixels, tile, x, y, tilePixels[x + y * TileSize]);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Failed to load texture override {path}: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>Writes the generated (pre-override) tiles out as individual 16x16
+    /// PNGs into <paramref name="dir"/>, giving a baseline to edit. Invoked by the
+    /// --dump-textures flag, which exits right after.</summary>
+    public static void DumpTiles(GraphicsDevice device, string dir)
+    {
+        Directory.CreateDirectory(dir);
+        var pixels = GenerateTiles();
+
+        var tilePixels = new Color[TileSize * TileSize];
+        using var tileTexture = new Texture2D(device, TileSize, TileSize);
+        for (int tile = 0; tile < TileNames.Length; tile++)
+        {
+            for (int y = 0; y < TileSize; y++)
+                for (int x = 0; x < TileSize; x++)
+                {
+                    int px = (tile % TilesPerRow) * TileSize + x;
+                    int py = (tile / TilesPerRow) * TileSize + y;
+                    tilePixels[x + y * TileSize] = pixels[px + py * AtlasSize];
+                }
+
+            tileTexture.SetData(tilePixels);
+            string path = Path.Combine(dir, TileNames[tile] + ".png");
+            using var fs = File.Create(path);
+            tileTexture.SaveAsPng(fs, TileSize, TileSize);
+        }
+
+        Console.WriteLine($"Dumped {TileNames.Length} textures to {Path.GetFullPath(dir)}");
     }
 
     /// <summary>
