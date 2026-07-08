@@ -700,7 +700,7 @@ public class MainGame : Game
         {
             var (id, count) = present[i];
             float pct = 100f * count / solid;
-            freq.Add($"{(BlockType)id} {pct:0.0}");
+            freq.Add($"{(BlockType)id} {pct:0.00}");
         }
     }
 
