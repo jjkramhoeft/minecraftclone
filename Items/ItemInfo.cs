@@ -53,7 +53,9 @@ public static class ItemInfo
     public static ItemType GetDrop(BlockType block) => block switch
     {
         BlockType.Grass => ItemType.Dirt,
-        BlockType.Leaves => ItemType.None,
+        BlockType.Leaves or BlockType.BirchLeaves or BlockType.PineLeaves => ItemType.None,
+        // Birch/pine logs aren't items themselves; chopping them yields plain wood.
+        BlockType.BirchLog or BlockType.PineLog => ItemType.Wood,
         BlockType.Air => ItemType.None,
         BlockType.CoalOre => ItemType.Coal,
         BlockType.FurnaceLit => ItemType.Furnace,

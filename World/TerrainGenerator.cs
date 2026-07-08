@@ -248,10 +248,13 @@ public class TerrainGenerator
         }
     }
 
+    private enum TreeSpecies { Oak, Birch, Pine }
+
     /// <summary>
     /// Trees are planted only where the whole canopy (radius 2) fits inside the
-    /// chunk, so no tree ever straddles a chunk border. Placement comes from a
-    /// deterministic hash of the world column, so it's stable across runs.
+    /// chunk, so no tree ever straddles a chunk border. Placement and species
+    /// come from a deterministic hash of the world column, so they're stable
+    /// across runs. Birch (~5%) and pine (~10%) sprinkle in among the oaks.
     /// </summary>
     private void PlantTrees(Chunk chunk, ReadOnlySpan<int> heights, ReadOnlySpan<byte> biomes)
     {
@@ -272,32 +275,80 @@ public class TerrainGenerator
                 if (chunk.GetBlock(x, surface, z) != BlockType.Grass)
                     continue;
 
-                int trunkHeight = 4 + (hash / spacing) % 3; // 4-6
-                int topY = surface + trunkHeight;
-                if (topY + 2 >= Chunk.SizeY)
-                    continue;
+                // Species from a separately-salted hash so it doesn't correlate
+                // with the trunk-height bits below.
+                int speciesRoll = Hash(worldX, worldZ, Seed ^ 0x6D5A4C3B) % 100;
+                TreeSpecies species = speciesRoll < 5 ? TreeSpecies.Birch
+                    : speciesRoll < 15 ? TreeSpecies.Pine
+                    : TreeSpecies.Oak;
 
-                // Canopy: two 5x5 layers (minus corners), one 3x3, one plus-shape cap.
-                for (int y = topY - 1; y <= topY; y++)
-                    for (int dx = -2; dx <= 2; dx++)
-                        for (int dz = -2; dz <= 2; dz++)
-                            if (!(Math.Abs(dx) == 2 && Math.Abs(dz) == 2))
-                                SetIfAir(chunk, x + dx, y, z + dz, BlockType.Leaves);
-
-                for (int dx = -1; dx <= 1; dx++)
-                    for (int dz = -1; dz <= 1; dz++)
-                        SetIfAir(chunk, x + dx, topY + 1, z + dz, BlockType.Leaves);
-
-                SetIfAir(chunk, x, topY + 2, z, BlockType.Leaves);
-                SetIfAir(chunk, x + 1, topY + 2, z, BlockType.Leaves);
-                SetIfAir(chunk, x - 1, topY + 2, z, BlockType.Leaves);
-                SetIfAir(chunk, x, topY + 2, z + 1, BlockType.Leaves);
-                SetIfAir(chunk, x, topY + 2, z - 1, BlockType.Leaves);
-
-                for (int y = surface + 1; y <= topY; y++)
-                    chunk.SetBlock(x, y, z, BlockType.Wood);
+                if (species == TreeSpecies.Pine)
+                    PlantPine(chunk, x, z, surface, trunkHeight: 6 + (hash / spacing) % 3); // 6-8
+                else
+                    PlantBroadleaf(chunk, x, z, surface, trunkHeight: 4 + (hash / spacing) % 3, // 4-6
+                        log: species == TreeSpecies.Birch ? BlockType.BirchLog : BlockType.Wood,
+                        leaf: species == TreeSpecies.Birch ? BlockType.BirchLeaves : BlockType.Leaves);
             }
         }
+    }
+
+    /// <summary>Oak/birch canopy: two 5x5 leaf layers (minus corners), a 3x3,
+    /// and a plus-shape cap over a straight trunk.</summary>
+    private static void PlantBroadleaf(Chunk chunk, int x, int z, int surface, int trunkHeight, BlockType log, BlockType leaf)
+    {
+        int topY = surface + trunkHeight;
+        if (topY + 2 >= Chunk.SizeY)
+            return;
+
+        for (int y = topY - 1; y <= topY; y++)
+            for (int dx = -2; dx <= 2; dx++)
+                for (int dz = -2; dz <= 2; dz++)
+                    if (!(Math.Abs(dx) == 2 && Math.Abs(dz) == 2))
+                        SetIfAir(chunk, x + dx, y, z + dz, leaf);
+
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+                SetIfAir(chunk, x + dx, topY + 1, z + dz, leaf);
+
+        SetIfAir(chunk, x, topY + 2, z, leaf);
+        SetIfAir(chunk, x + 1, topY + 2, z, leaf);
+        SetIfAir(chunk, x - 1, topY + 2, z, leaf);
+        SetIfAir(chunk, x, topY + 2, z + 1, leaf);
+        SetIfAir(chunk, x, topY + 2, z - 1, leaf);
+
+        for (int y = surface + 1; y <= topY; y++)
+            chunk.SetBlock(x, y, z, log);
+    }
+
+    // Needle-ring radii from the tip downward: alternating wide/narrow tiers
+    // give the classic spiky conifer silhouette. Max radius 2 keeps the canopy
+    // inside the planted column's 2-block border.
+    private static readonly int[] PineRingRadii = { 1, 1, 2, 1, 2, 2 };
+
+    /// <summary>Pine: a single-block leafy tip above tiered needle rings on a
+    /// bare-based trunk.</summary>
+    private static void PlantPine(Chunk chunk, int x, int z, int surface, int trunkHeight)
+    {
+        int topY = surface + trunkHeight;
+        if (topY + 1 >= Chunk.SizeY)
+            return;
+
+        SetIfAir(chunk, x, topY + 1, z, BlockType.PineLeaves); // tip
+
+        for (int layer = 0; layer < PineRingRadii.Length; layer++)
+        {
+            int y = topY - layer;
+            if (y <= surface)
+                break;
+            int r = PineRingRadii[layer];
+            for (int dx = -r; dx <= r; dx++)
+                for (int dz = -r; dz <= r; dz++)
+                    if (r < 2 || Math.Abs(dx) != 2 || Math.Abs(dz) != 2) // round the wide tiers
+                        SetIfAir(chunk, x + dx, y, z + dz, BlockType.PineLeaves);
+        }
+
+        for (int y = surface + 1; y <= topY; y++)
+            chunk.SetBlock(x, y, z, BlockType.PineLog);
     }
 
     private static void SetIfAir(Chunk chunk, int x, int y, int z, BlockType type)

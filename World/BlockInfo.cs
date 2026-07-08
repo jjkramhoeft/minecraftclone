@@ -81,6 +81,12 @@ public static class BlockInfo
     public const int TileWaterBucket = 49;
     public const int TileCraftingTop = 50;
     public const int TileCraftingSide = 51;
+    public const int TileBirchBark = 52;
+    public const int TileBirchTop = 53;
+    public const int TileBirchLeaves = 54;
+    public const int TilePineBark = 55;
+    public const int TilePineTop = 56;
+    public const int TilePineLeaves = 57;
 
     /// <summary>Solid blocks collide and cast ambient occlusion. Plants are
     /// deliberately NOT solid — you walk through them.</summary>
@@ -153,7 +159,11 @@ public static class BlockInfo
         BlockType.Stone => TileStone,
         BlockType.Sand => TileSand,
         BlockType.Wood => face is BlockFace.Top or BlockFace.Bottom ? TileWoodTop : TileWoodSide,
+        BlockType.BirchLog => face is BlockFace.Top or BlockFace.Bottom ? TileBirchTop : TileBirchBark,
+        BlockType.PineLog => face is BlockFace.Top or BlockFace.Bottom ? TilePineTop : TilePineBark,
         BlockType.Leaves => TileLeaves,
+        BlockType.BirchLeaves => TileBirchLeaves,
+        BlockType.PineLeaves => TilePineLeaves,
         BlockType.Water => TileWater,
         BlockType.Planks => TilePlanks,
         BlockType.Bricks => TileBricks,
@@ -192,8 +202,8 @@ public static class BlockInfo
     public static float GetHardness(BlockType type) => type switch
     {
         BlockType.Grass or BlockType.Dirt or BlockType.Sand => 0.75f,
-        BlockType.Leaves => 0.3f,
-        BlockType.Wood => 2f,
+        BlockType.Leaves or BlockType.BirchLeaves or BlockType.PineLeaves => 0.3f,
+        BlockType.Wood or BlockType.BirchLog or BlockType.PineLog => 2f,
         BlockType.Planks or BlockType.Chest or BlockType.CraftingTable => 1.5f,
         BlockType.Stone or BlockType.Bricks or BlockType.Furnace or BlockType.FurnaceLit => 4f,
         BlockType.CoalOre or BlockType.IronOre => 5f,
@@ -207,7 +217,8 @@ public static class BlockInfo
         BlockType.Stone or BlockType.Bricks or BlockType.CoalOre or BlockType.IronOre
             or BlockType.Furnace or BlockType.FurnaceLit => ToolClass.Pickaxe,
         BlockType.Wood or BlockType.Planks or BlockType.Leaves or BlockType.Chest
-            or BlockType.CraftingTable => ToolClass.Axe,
+            or BlockType.CraftingTable or BlockType.BirchLog or BlockType.PineLog
+            or BlockType.BirchLeaves or BlockType.PineLeaves => ToolClass.Axe,
         BlockType.Grass or BlockType.Dirt or BlockType.Sand => ToolClass.Shovel,
         _ => ToolClass.None,
     };

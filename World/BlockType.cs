@@ -35,4 +35,13 @@ public enum BlockType : byte
     Glass = 27,
     Chest = 28,
     CraftingTable = 29,
+    // Tree-species variants — worldgen only, never held as items (birch/pine
+    // logs drop plain Wood, their leaves drop nothing), so they sit above the
+    // item-mirrored id range (see ItemType) and need no ItemType entry. Any
+    // block with an id >= 30 must define an explicit ItemInfo.GetDrop, or the
+    // default FromBlock cast produces a bogus item.
+    BirchLog = 30,
+    BirchLeaves = 31,
+    PineLog = 32,
+    PineLeaves = 33,
 }

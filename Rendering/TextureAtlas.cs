@@ -29,9 +29,9 @@ public class TextureAtlas
         DrawSpeckled(pixels, BlockInfo.TileDirt, new Color(134, 96, 67), 12);
         DrawSpeckled(pixels, BlockInfo.TileStone, new Color(125, 125, 125), 9);
         DrawSpeckled(pixels, BlockInfo.TileSand, new Color(219, 207, 163), 9);
-        DrawBark(pixels);
-        DrawWoodTop(pixels);
-        DrawLeaves(pixels);
+        DrawBark(pixels, BlockInfo.TileWoodSide, new Color(102, 81, 50));
+        DrawLogTop(pixels, BlockInfo.TileWoodTop, new Color(168, 132, 84), new Color(126, 96, 58));
+        DrawLeavesTile(pixels, BlockInfo.TileLeaves, new Color(58, 138, 42), new Color(30, 84, 22));
         DrawSpeckled(pixels, BlockInfo.TileWater, new Color(58, 110, 216), 10);
         DrawPlanks(pixels);
         DrawBricks(pixels);
@@ -76,6 +76,12 @@ public class TextureAtlas
         DrawBucket(pixels, BlockInfo.TileWaterBucket, filled: true);
         DrawCraftingTable(pixels, BlockInfo.TileCraftingTop, top: true);
         DrawCraftingTable(pixels, BlockInfo.TileCraftingSide, top: false);
+        DrawBirchBark(pixels);
+        DrawLogTop(pixels, BlockInfo.TileBirchTop, new Color(228, 226, 214), new Color(198, 196, 184));
+        DrawLeavesTile(pixels, BlockInfo.TileBirchLeaves, new Color(112, 176, 86), new Color(72, 132, 54));
+        DrawBark(pixels, BlockInfo.TilePineBark, new Color(84, 58, 38));
+        DrawLogTop(pixels, BlockInfo.TilePineTop, new Color(120, 88, 58), new Color(92, 66, 42));
+        DrawLeavesTile(pixels, BlockInfo.TilePineLeaves, new Color(40, 96, 48), new Color(24, 66, 32));
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -135,10 +141,11 @@ public class TextureAtlas
         }
     }
 
-    private static void DrawBark(Color[] pixels)
+    /// <summary>Bark side: vertical streaks over a base color. Shared by every
+    /// log species — the caller picks the tile and base color.</summary>
+    private static void DrawBark(Color[] pixels, int tile, Color baseColor)
     {
-        var rng = RngFor(BlockInfo.TileWoodSide);
-        var baseColor = new Color(102, 81, 50);
+        var rng = RngFor(tile);
         for (int x = 0; x < TileSize; x++)
         {
             int columnShade = rng.Next(-18, 19); // vertical streaks
@@ -148,23 +155,42 @@ public class TextureAtlas
                     Math.Clamp(baseColor.R + columnShade, 0, 255),
                     Math.Clamp(baseColor.G + columnShade, 0, 255),
                     Math.Clamp(baseColor.B + columnShade, 0, 255));
-                SetPixel(pixels, BlockInfo.TileWoodSide, x, y, Jitter(rng, c, 6));
+                SetPixel(pixels, tile, x, y, Jitter(rng, c, 6));
             }
         }
     }
 
-    private static void DrawWoodTop(Color[] pixels)
+    /// <summary>Birch bark: pale trunk with scattered dark horizontal lenticels.</summary>
+    private static void DrawBirchBark(Color[] pixels)
     {
-        var rng = RngFor(BlockInfo.TileWoodTop);
-        var light = new Color(168, 132, 84);
-        var dark = new Color(126, 96, 58);
+        var rng = RngFor(BlockInfo.TileBirchBark);
+        var pale = new Color(224, 224, 214);
+        var dark = new Color(60, 62, 58);
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, BlockInfo.TileBirchBark, x, y, Jitter(rng, pale, 7));
+
+        for (int d = 0; d < 6; d++)
+        {
+            int y = rng.Next(TileSize);
+            int x = rng.Next(TileSize - 3);
+            int len = 2 + rng.Next(3);
+            for (int i = 0; i < len; i++)
+                SetPixel(pixels, BlockInfo.TileBirchBark, x + i, y, Jitter(rng, dark, 8));
+        }
+    }
+
+    /// <summary>Log end grain: square growth rings around the center, in the
+    /// caller's light/dark ring colors.</summary>
+    private static void DrawLogTop(Color[] pixels, int tile, Color light, Color dark)
+    {
+        var rng = RngFor(tile);
         for (int y = 0; y < TileSize; y++)
         {
             for (int x = 0; x < TileSize; x++)
             {
-                // Square growth rings around the center.
                 int ring = Math.Max(Math.Abs(x * 2 - 15), Math.Abs(y * 2 - 15)) / 2;
-                SetPixel(pixels, BlockInfo.TileWoodTop, x, y, Jitter(rng, ring % 2 == 0 ? light : dark, 7));
+                SetPixel(pixels, tile, x, y, Jitter(rng, ring % 2 == 0 ? light : dark, 7));
             }
         }
     }
@@ -622,14 +648,14 @@ public class TextureAtlas
         }
     }
 
-    private static void DrawLeaves(Color[] pixels)
+    /// <summary>Leafy speckle in the caller's base/shadow greens — shared by
+    /// oak, birch, and pine (needles).</summary>
+    private static void DrawLeavesTile(Color[] pixels, int tile, Color baseColor, Color shadow)
     {
-        var rng = RngFor(BlockInfo.TileLeaves);
-        var baseColor = new Color(58, 138, 42);
-        var shadow = new Color(30, 84, 22);
+        var rng = RngFor(tile);
         for (int y = 0; y < TileSize; y++)
             for (int x = 0; x < TileSize; x++)
-                SetPixel(pixels, BlockInfo.TileLeaves, x, y,
+                SetPixel(pixels, tile, x, y,
                     rng.Next(10) == 0 ? shadow : Jitter(rng, baseColor, 20));
     }
 }
