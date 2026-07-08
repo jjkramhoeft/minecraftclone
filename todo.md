@@ -6,15 +6,6 @@ Compared against: [fogleman/Craft](https://github.com/fogleman/Craft) (C, ~10k l
 [Terasology](https://terasology.org/) (Java, survival/rendering showcase), and classic/beta
 Minecraft itself as the reference.
 
-## Main outstanding 
-
-- [x] Fix lighting in caves/under ground. It's supposed to be dark underground, no matter what 
-      time of day it is. Currently it is light in caves under ground at daytime, and only dark under ground when it also is dark obove ground at night time. Torches should be the main light source under ground.
-- [x] Only show available recipies (if not at CraftingTable do not show recipies from crafting table)
-- [x] Hold active tool in hand. Visual improvement. Currently the players hands are alway empty, 
-      even when a tool is equipped (make pickaxe, axe, shovel and bucket)
-- [x] Stars should not be visible through the clouds
-
 ## Future ideas (not ready yet)
 
 - [ ] More biomes: Mountains, Pine forest, Ocean
@@ -30,3 +21,4 @@ Minecraft itself as the reference.
       — scale 0.55, 
       — the Z/Y rotations, 
       — and the translation (0.5, -0.5, -0.9).
+- [ ] Fix the arm swing when walking in 1st person view

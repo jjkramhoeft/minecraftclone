@@ -149,7 +149,7 @@ public class PlayerModel
         _itemQuad[2] = new VertexPositionColorTexture(new Vector3(0.5f, 0.5f, 0f), Color.White, new Vector2(uv.Z, uv.Y));
         _itemQuad[3] = new VertexPositionColorTexture(new Vector3(-0.5f, 0.5f, 0f), Color.White, new Vector2(uv.X, uv.Y));
 
-        var local = Matrix.CreateScale(0.55f)
+        var local = Matrix.CreateScale(1.00f)
             * Matrix.CreateRotationZ(-0.6f)                       // handle points to lower-right
             * Matrix.CreateRotationY(0.4f)                        // slight turn for depth
             * Matrix.CreateRotationX(-SwingAngle * 0.25f)         // dips with the punch swing
