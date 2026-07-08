@@ -8,13 +8,6 @@ Minecraft itself as the reference.
 
 ## Main outstanding 
 
-- [X] Under water visuals. from above the water looks fine, but when swimming under 
-      the water there is no visual indication of the water. Solution tint all blue when under water.      
-- [X] More Tree types: Birch & Pine. for a start just place then as normal trees but with a
-      lower frequency (birch as 5% of trees and pine as 10% of trees). Birch should have slightly lighter green leaves and whitish trunks and same sape as normal trees. Pine should have slightly darker green leaves(needles) and a cone shape
-- [X] More plants/flowers: Add a fern plant. it can spawn under/close to pine trees   
-- [X] More Blocks: Add a Cobblestone block. It is not spawn by the normal world generator, but
-      instead when stone is placed it is placed as cobblestone, and if cobblestone is mined it is collected as stone.
 - [ ] Fix lighting in caves/under ground. It's supposed to be dark underground, no matter what 
       time of day it is. Currently it is light in caves under ground at daytime. Torches should be the main light source under ground.
 
@@ -29,3 +22,6 @@ Minecraft itself as the reference.
 - [ ] Hold active tool in hand. Visual improvement
 - [ ] Only show available recipies (if not CraftingTable do not show recipies from crafting table)
 - [ ] Stars should not be visible through the clouds
+- [ ] Better break up decal. Do not use the current ramdom 'splatter' - there should be progression 
+      and some build up in the dark pattern.
+- [ ] Better cobblestone texture      
