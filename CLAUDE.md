@@ -34,6 +34,6 @@ Textures are generated in code — the MGCB content pipeline (`Content/Content.m
 ## Gotchas
 
 - World saves live in `saves/{default,world2,world3}/` relative to the working directory, so they exist both under the repo root and under `bin/Debug/net9.0/`. Never modify or delete them; smoke mode deliberately uses a separate `saves/smoke/` world and skips saving.
-- `README.md`'s "Non-goals" section is partly stale: crafting, inventory, and flowing water are now implemented.
+- `README.md` was refreshed on 2026-07-08 to match the current feature set; keep it in sync when adding player-facing features.
 - Keep `Update`/`Draw` paths allocation-free — per-frame garbage causes GC hitches in MonoGame.
 - Escape opens the pause menu (resume/save/quit to menu); the game exits via the menu or window close and autosaves in `OnExiting` when a world is loaded. Smoke mode skips that autosave.
