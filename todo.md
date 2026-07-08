@@ -55,7 +55,7 @@ Minecraft itself as the reference.
       extend the 3×5 glyph table to A–Z first.
 - [x] **Furnace + smelting.** Iron ore → ingots, sand → glass. First block with state
       and a timer; follows the chest/container pattern below.
-- [ ] **Chests.** First container block; needs per-block inventory storage keyed by
+- [x] **Chests.** First container block; needs per-block inventory storage keyed by
       position, saved in world metadata (the chunk byte array can't hold it).
 - [ ] **Item drops as world entities.** Broken blocks currently teleport into the
       inventory (and are *lost* when it's full — see `BlockInteraction.BreakBlock`).

@@ -29,6 +29,7 @@ public enum ItemType : ushort
     Furnace = 25,
     // 26 = FurnaceLit, never an item
     Glass = 27,
+    Chest = 28,
 
     Stick = 32,
     WoodenPickaxe = 33,

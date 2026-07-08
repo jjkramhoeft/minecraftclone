@@ -47,6 +47,8 @@ public class MainGame : Game
     private GameSounds _sounds;
     private PlayerHealth _health;
     private Furnaces _furnaces;
+    private Chests _chests;
+    private ChestScreen _chestScreen;
 
     // Footstep/splash state, driven from player movement each frame.
     private Vector3 _lastStepPosition;
@@ -143,6 +145,21 @@ public class MainGame : Game
             foreach (var f in meta.Furnaces)
                 _furnaces.Restore(f.X, f.Y, f.Z, (ItemType)f.OutputItem, f.OutputCount, f.SecondsRemaining);
         }
+        _chests.Clear();
+        if (meta?.Chests != null)
+        {
+            foreach (var c in meta.Chests)
+            {
+                var slots = new ItemStack[Chests.ChestSize];
+                if (c.Slots != null)
+                    foreach (var s in c.Slots)
+                        if (s.Slot >= 0 && s.Slot < Chests.ChestSize)
+                            slots[s.Slot] = new ItemStack((ItemType)s.Item, s.Count);
+                _chests.Restore(c.X, c.Y, c.Z, slots);
+            }
+        }
+        if (_chestScreen.IsOpen)
+            _chestScreen.Close();
         _blockInteraction = new BlockInteraction(_chunkManager, _inventory, _player, _blockUpdater);
         WireInteractionEvents();
         _health.Reset();
@@ -208,10 +225,12 @@ public class MainGame : Game
         _health = new PlayerHealth();
         _health.Died += RespawnPlayer;
         _furnaces = new Furnaces();
+        _chests = new Chests();
         _hud = new Hud(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
         _hotbar = new Hotbar(GraphicsDevice, _inventory);
         _inventoryScreen = new InventoryScreen(GraphicsDevice, _inventory);
+        _chestScreen = new ChestScreen(GraphicsDevice, _inventory);
 
         _menu = new MenuScreen(GraphicsDevice);
         _menu.WorldChosen += slot => StartWorld(WorldSlotNames[slot]);
@@ -251,20 +270,31 @@ public class MainGame : Game
 
         if (keyboard.IsKeyDown(Keys.Escape) && _previousKeyboard.IsKeyUp(Keys.Escape))
         {
-            if (_inventoryScreen.IsOpen)
+            if (_chestScreen.IsOpen)
+                CloseChestScreen();
+            else if (_inventoryScreen.IsOpen)
                 ToggleInventoryScreen();
             else
                 OpenPauseMenu();
         }
 
         if (keyboard.IsKeyDown(Keys.E) && _previousKeyboard.IsKeyUp(Keys.E))
-            ToggleInventoryScreen();
+        {
+            if (_chestScreen.IsOpen)
+                CloseChestScreen();
+            else
+                ToggleInventoryScreen();
+        }
 
         if (keyboard.IsKeyDown(Keys.V) && _previousKeyboard.IsKeyUp(Keys.V))
             _camera.ThirdPerson = !_camera.ThirdPerson;
 
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        if (_inventoryScreen.IsOpen)
+        if (_chestScreen.IsOpen)
+        {
+            _chestScreen.Update(mouse, _previousMouse, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+        }
+        else if (_inventoryScreen.IsOpen)
         {
             _inventoryScreen.Update(mouse, _previousMouse, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
         }
@@ -317,11 +347,23 @@ public class MainGame : Game
         _blockInteraction.ActionPerformed += _playerModel.TriggerSwing;
         _blockInteraction.BlockBroken += _sounds.PlayBreak;
         _blockInteraction.BlockPlaced += _sounds.PlayPlace;
-        _blockInteraction.UseBlock = (x, y, z, _) => _furnaces.Use(_chunkManager, _inventory, x, y, z);
+        _blockInteraction.UseBlock = (x, y, z, type) =>
+        {
+            if (type == BlockType.Chest)
+            {
+                _chestScreen.Open(_chests.GetOrCreate(x, y, z));
+                IsMouseVisible = true;
+                _mouseCaptured = false;
+                return true;
+            }
+            return _furnaces.Use(_chunkManager, _inventory, x, y, z);
+        };
         _blockInteraction.BlockBrokenAt += (x, y, z, type) =>
         {
             if (type is BlockType.Furnace or BlockType.FurnaceLit)
                 _furnaces.OnBroken(_inventory, x, y, z);
+            else if (type == BlockType.Chest)
+                _chests.OnBroken(_inventory, x, y, z);
         };
     }
 
@@ -380,6 +422,13 @@ public class MainGame : Game
         _mouseCaptured = false;
     }
 
+    private void CloseChestScreen()
+    {
+        _chestScreen.Close();
+        IsMouseVisible = false;
+        _mouseCaptured = false;
+    }
+
     private void SaveWorld()
     {
         var inventorySlots = new List<InventorySlotData>();
@@ -387,6 +436,16 @@ public class MainGame : Game
         {
             if (!_inventory[i].IsEmpty)
                 inventorySlots.Add(new InventorySlotData { Slot = i, Item = (int)_inventory[i].Item, Count = _inventory[i].Count });
+        }
+
+        var chestData = new List<ChestData>();
+        foreach (var (pos, slots) in _chests.All)
+        {
+            var slotData = new List<InventorySlotData>();
+            for (int i = 0; i < slots.Length; i++)
+                if (!slots[i].IsEmpty)
+                    slotData.Add(new InventorySlotData { Slot = i, Item = (int)slots[i].Item, Count = slots[i].Count });
+            chestData.Add(new ChestData { X = pos.X, Y = pos.Y, Z = pos.Z, Slots = slotData });
         }
 
         var furnaceData = new List<FurnaceData>();
@@ -412,6 +471,7 @@ public class MainGame : Game
             Inventory = inventorySlots,
             TimeOfDay = _dayNight.TimeOfDay,
             Furnaces = furnaceData,
+            Chests = chestData,
         });
     }
 
@@ -479,7 +539,8 @@ public class MainGame : Game
             _worldRenderer.Draw(GraphicsDevice, _camera, _chunkManager.Meshes);
             _fallingBlockRenderer.Draw(GraphicsDevice, _camera, _fallingBlocks.Entries);
             _mobRenderer.Draw(_camera, _mobs.All);
-            bool showGameplayUi = !_inventoryScreen.IsOpen && _menu.Current == MenuScreen.Mode.Hidden;
+            bool showGameplayUi = !_inventoryScreen.IsOpen && !_chestScreen.IsOpen
+                && _menu.Current == MenuScreen.Mode.Hidden;
             if (showGameplayUi)
             {
                 if (_blockInteraction.IsMining)
@@ -501,6 +562,7 @@ public class MainGame : Game
             _hotbar.Draw(_spriteBatch, _atlas, _font, width, height);
             if (_inventoryScreen.IsOpen)
                 _inventoryScreen.Draw(_spriteBatch, _atlas, _font, Mouse.GetState(), width, height);
+            _chestScreen.Draw(_spriteBatch, _atlas, _font, Mouse.GetState(), width, height);
 
             UpdateDebugTitle(gameTime);
         }

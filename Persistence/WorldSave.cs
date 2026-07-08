@@ -24,9 +24,17 @@ public class FurnaceData
     public float SecondsRemaining { get; set; }
 }
 
+public class ChestData
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Z { get; set; }
+    public List<InventorySlotData> Slots { get; set; }
+}
+
 public class WorldMetadata
 {
-    public const int CurrentFormatVersion = 3; // v2 added Inventory; v3 furnaces
+    public const int CurrentFormatVersion = 4; // v2 added Inventory; v3 furnaces; v4 chests
 
     public int FormatVersion { get; set; } = CurrentFormatVersion;
     public int Seed { get; set; }
@@ -46,6 +54,9 @@ public class WorldMetadata
 
     /// <summary>Null in pre-v3 saves — no furnace state.</summary>
     public List<FurnaceData> Furnaces { get; set; }
+
+    /// <summary>Null in pre-v4 saves — no chests.</summary>
+    public List<ChestData> Chests { get; set; }
 }
 
 /// <summary>

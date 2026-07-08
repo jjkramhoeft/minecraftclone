@@ -70,6 +70,8 @@ public class TextureAtlas
         DrawFurnaceFront(pixels, BlockInfo.TileFurnaceFront, lit: false);
         DrawFurnaceFront(pixels, BlockInfo.TileFurnaceFrontLit, lit: true);
         DrawGlass(pixels);
+        DrawChest(pixels, BlockInfo.TileChestSide, latch: false);
+        DrawChest(pixels, BlockInfo.TileChestFront, latch: true);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -466,6 +468,33 @@ public class TextureAtlas
                 bool glint = x - y is 4 or 5 && x < 11;
                 SetPixel(pixels, BlockInfo.TileGlass, x, y,
                     edge || glint ? frame : Color.Transparent);
+            }
+        }
+    }
+
+    /// <summary>Chest: warm planks with a dark rim and lid seam; the front
+    /// adds the latch.</summary>
+    private static void DrawChest(Color[] pixels, int tile, bool latch)
+    {
+        var rng = RngFor(tile);
+        var wood = new Color(158, 116, 66);
+        var rim = new Color(92, 66, 38);
+        for (int y = 0; y < TileSize; y++)
+        {
+            for (int x = 0; x < TileSize; x++)
+            {
+                bool edge = x == 0 || y == 0 || x == TileSize - 1 || y == TileSize - 1;
+                bool seam = y == 5; // lid line
+                SetPixel(pixels, tile, x, y, edge || seam ? rim : Jitter(rng, wood, 9));
+            }
+        }
+        if (latch)
+        {
+            var metal = new Color(190, 190, 200);
+            for (int y = 4; y <= 7; y++)
+            {
+                SetPixel(pixels, tile, 7, y, metal);
+                SetPixel(pixels, tile, 8, y, metal);
             }
         }
     }

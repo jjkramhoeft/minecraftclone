@@ -18,6 +18,7 @@ public static class Recipes
         new(new ItemStack(ItemType.StoneShovel, 1), new[] { (ItemType.Stone, 1), (ItemType.Stick, 2) }),
         new(new ItemStack(ItemType.Torch, 4), new[] { (ItemType.Coal, 1), (ItemType.Stick, 1) }),
         new(new ItemStack(ItemType.Furnace, 1), new[] { (ItemType.Stone, 8) }),
+        new(new ItemStack(ItemType.Chest, 1), new[] { (ItemType.Planks, 8) }),
         new(new ItemStack(ItemType.IronPickaxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }),
         new(new ItemStack(ItemType.IronAxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }),
         new(new ItemStack(ItemType.IronShovel, 1), new[] { (ItemType.IronIngot, 1), (ItemType.Stick, 2) }),
