@@ -11,7 +11,7 @@ Minecraft itself as the reference.
 
 - [x] Per-corner water surface smoothing so flows slope instead of stair-step.
 - [x] Sprint field-of-view kick + swim/splash particles.
-- [ ] Crafting: keep the recipe-list UI (it's honestly friendlier than a grid), but
+- [x] Crafting: keep the recipe-list UI (it's honestly friendlier than a grid), but
       gate advanced recipes behind a crafting table block for progression texture.
 - [x] Star twinkle + moon phases in `Rendering/SkyRenderer.cs`.
 - [x] No fall damage when starting (first fall from the heavens)
