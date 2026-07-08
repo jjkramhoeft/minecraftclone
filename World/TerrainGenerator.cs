@@ -3,26 +3,31 @@ using Microsoft.Xna.Framework;
 
 namespace MinecraftClone.World;
 
+public enum Biome : byte
+{
+    Desert,
+    Plains,
+    Forest,
+}
+
 /// <summary>
 /// Fills chunks with terrain derived deterministically from a single seed:
-/// fBm-noise hills (stone core, dirt layer, grass top), sandy lowlands, and
-/// scattered trees.
+/// fBm-noise hills (stone core, dirt layer, grass top), sandy lowlands,
+/// biome-dependent vegetation, and carved caves.
 /// </summary>
 public class TerrainGenerator
 {
     private const int BaseHeight = 44;
-    private const float Amplitude = 16f;
     private const int DirtDepth = 3;
     private const int SandLevel = 38;       // surfaces at or below this are sandy
     private const int WaterLevel = 37;      // valleys below this fill with water
-    private const int TreeSpacing = 61;     // 1 tree per ~61 eligible columns
-    private const int FlowerSpacing = 17;   // 1 flower per ~17 grass columns
     private const int ReedChance = 3;       // reeds on ~1/3 of eligible shoreline columns
 
     private const int BedrockDepth = 4;     // never carve at or below this — fake bedrock
     private const float CaveThreshold = 0.09f; // tunnel radius: both noise fields within ±this
 
     private readonly FastNoiseLite _heightNoise;
+    private readonly FastNoiseLite _biomeNoise;
     private readonly FastNoiseLite _caveNoiseA;
     private readonly FastNoiseLite _caveNoiseB;
 
@@ -37,6 +42,13 @@ public class TerrainGenerator
         _heightNoise.SetFractalOctaves(4);
         _heightNoise.SetFrequency(0.008f);
 
+        // One very low-frequency field drives both biome choice and terrain
+        // amplitude, so deserts come out flat and forests mountainous with no
+        // height cliffs at biome borders.
+        _biomeNoise = new FastNoiseLite(seed ^ 0x517CC1B7);
+        _biomeNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        _biomeNoise.SetFrequency(0.0018f);
+
         // "Spaghetti" caves: a cell is carved where BOTH 3D fields sit near
         // zero, which traces winding tubes instead of open blobs.
         _caveNoiseA = new FastNoiseLite(seed ^ 0x1B873593);
@@ -50,6 +62,7 @@ public class TerrainGenerator
     public void Generate(Chunk chunk)
     {
         Span<int> heights = stackalloc int[Chunk.SizeX * Chunk.SizeZ];
+        Span<byte> biomes = stackalloc byte[Chunk.SizeX * Chunk.SizeZ];
 
         for (int x = 0; x < Chunk.SizeX; x++)
         {
@@ -58,10 +71,19 @@ public class TerrainGenerator
                 int worldX = chunk.Coord.X * Chunk.SizeX + x;
                 int worldZ = chunk.Coord.Z * Chunk.SizeZ + z;
 
+                float biomeValue = _biomeNoise.GetNoise(worldX, worldZ); // [-1, 1]
+                Biome biome =
+                    biomeValue > 0.35f ? Biome.Desert :
+                    biomeValue < -0.15f ? Biome.Forest :
+                    Biome.Plains;
+                biomes[x + z * Chunk.SizeX] = (byte)biome;
+
+                // Deserts (high biomeValue) are flat, forests mountainous.
+                float amplitude = MathHelper.Lerp(24f, 9f, (biomeValue + 1f) * 0.5f);
                 float noise = _heightNoise.GetNoise(worldX, worldZ); // [-1, 1]
-                int height = (int)MathHelper.Clamp(BaseHeight + noise * Amplitude, 1, Chunk.SizeY - 1);
+                int height = (int)MathHelper.Clamp(BaseHeight + noise * amplitude, 1, Chunk.SizeY - 1);
                 heights[x + z * Chunk.SizeX] = height;
-                bool sandy = height <= SandLevel;
+                bool sandy = height <= SandLevel || biome == Biome.Desert;
 
                 for (int y = 0; y <= height; y++)
                 {
@@ -82,10 +104,26 @@ public class TerrainGenerator
         }
 
         PlaceOres(chunk);
-        PlantTrees(chunk, heights);
-        ScatterFlowers(chunk, heights);
+        PlantTrees(chunk, heights, biomes);
+        ScatterFlowers(chunk, heights, biomes);
         GrowReeds(chunk, heights);
     }
+
+    /// <summary>1 tree per ~N eligible columns; 0 = no trees in this biome.</summary>
+    private static int TreeSpacingFor(Biome biome) => biome switch
+    {
+        Biome.Forest => 19,
+        Biome.Plains => 149,
+        _ => 0,
+    };
+
+    /// <summary>1 flower per ~N grass columns; 0 = none.</summary>
+    private static int FlowerSpacingFor(Biome biome) => biome switch
+    {
+        Biome.Plains => 11,
+        Biome.Forest => 29,
+        _ => 0,
+    };
 
     /// <summary>
     /// Depth-banded ore blobs, seeded per chunk so placement is stable across
@@ -183,16 +221,19 @@ public class TerrainGenerator
 
     /// <summary>Flowers on grass wherever the salted column hash says so —
     /// runs after trees, so columns under a canopy (leaves above) are skipped.</summary>
-    private void ScatterFlowers(Chunk chunk, ReadOnlySpan<int> heights)
+    private void ScatterFlowers(Chunk chunk, ReadOnlySpan<int> heights, ReadOnlySpan<byte> biomes)
     {
         for (int x = 0; x < Chunk.SizeX; x++)
         {
             for (int z = 0; z < Chunk.SizeZ; z++)
             {
+                int spacing = FlowerSpacingFor((Biome)biomes[x + z * Chunk.SizeX]);
+                if (spacing == 0)
+                    continue;
                 int worldX = chunk.Coord.X * Chunk.SizeX + x;
                 int worldZ = chunk.Coord.Z * Chunk.SizeZ + z;
                 int hash = Hash(worldX, worldZ, Seed ^ 0x5F375A86);
-                if (hash % FlowerSpacing != 0)
+                if (hash % spacing != 0)
                     continue;
 
                 int surface = heights[x + z * Chunk.SizeX];
@@ -201,7 +242,7 @@ public class TerrainGenerator
                     || chunk.GetBlock(x, surface + 1, z) != BlockType.Air)
                     continue;
 
-                var flower = (BlockType)((byte)BlockType.FlowerRed + hash / FlowerSpacing % 3);
+                var flower = (BlockType)((byte)BlockType.FlowerRed + hash / spacing % 3);
                 chunk.SetBlock(x, surface + 1, z, flower);
             }
         }
@@ -212,23 +253,26 @@ public class TerrainGenerator
     /// chunk, so no tree ever straddles a chunk border. Placement comes from a
     /// deterministic hash of the world column, so it's stable across runs.
     /// </summary>
-    private void PlantTrees(Chunk chunk, ReadOnlySpan<int> heights)
+    private void PlantTrees(Chunk chunk, ReadOnlySpan<int> heights, ReadOnlySpan<byte> biomes)
     {
         for (int x = 2; x < Chunk.SizeX - 2; x++)
         {
             for (int z = 2; z < Chunk.SizeZ - 2; z++)
             {
+                int spacing = TreeSpacingFor((Biome)biomes[x + z * Chunk.SizeX]);
+                if (spacing == 0)
+                    continue;
                 int worldX = chunk.Coord.X * Chunk.SizeX + x;
                 int worldZ = chunk.Coord.Z * Chunk.SizeZ + z;
                 int hash = Hash(worldX, worldZ, Seed);
-                if (hash % TreeSpacing != 0)
+                if (hash % spacing != 0)
                     continue;
 
                 int surface = heights[x + z * Chunk.SizeX];
                 if (chunk.GetBlock(x, surface, z) != BlockType.Grass)
                     continue;
 
-                int trunkHeight = 4 + (hash / TreeSpacing) % 3; // 4-6
+                int trunkHeight = 4 + (hash / spacing) % 3; // 4-6
                 int topY = surface + trunkHeight;
                 if (topY + 2 >= Chunk.SizeY)
                     continue;

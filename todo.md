@@ -18,7 +18,7 @@ Minecraft itself as the reference.
       enables torches; iron enables a tier-3 tool set on the existing
       `GetRequiredTier`/`GetToolTier` scaffolding in `World/BlockInfo.cs` /
       `Items/ItemInfo.cs`. Without ores the stone tier is a dead end.
-- [ ] **Biomes.** A second, low-frequency noise (temperature/moisture) selecting
+- [x] **Biomes.** A second, low-frequency noise (temperature/moisture) selecting
       surface palette + decoration density: desert (sand, no trees), forest (dense
       trees), plains. Even 3 biomes breaks up the current single-texture landscape.
       Amplitude modulation per biome gives mountains cheaply.
