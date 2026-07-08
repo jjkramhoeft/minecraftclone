@@ -24,6 +24,13 @@ public class ChunkMesh : IDisposable
     public ChunkCoord Coord { get; }
     public BoundingBox Bounds { get; }
 
+    /// <summary>Total vertices across all passes — perf telemetry (F3/smoke).</summary>
+    public int VertexCount { get; }
+    public int OpaqueVertexCount { get; }
+    public int WaterVertexCount { get; }
+    public int CutoutVertexCount { get; }
+    public int LightVertexCount { get; }
+
     public bool IsEmpty => _indexBuffer == null && _waterIndexBuffer == null
         && _cutoutIndexBuffer == null && _lightIndexBuffer == null;
     public bool HasOpaque => _indexBuffer != null;
@@ -38,10 +45,16 @@ public class ChunkMesh : IDisposable
         Coord = coord;
         var origin = new Vector3(coord.X * Chunk.SizeX, 0f, coord.Z * Chunk.SizeZ);
         Bounds = new BoundingBox(origin, origin + new Vector3(Chunk.SizeX, Chunk.SizeY, Chunk.SizeZ));
+        VertexCount = data.Vertices.Length + data.WaterVertices.Length
+            + data.CutoutVertices.Length + data.LightVertices.Length;
+        OpaqueVertexCount = data.Vertices.Length;
+        WaterVertexCount = data.WaterVertices.Length;
+        CutoutVertexCount = data.CutoutVertices.Length;
+        LightVertexCount = data.LightVertices.Length;
 
         if (data.Indices.Length > 0)
         {
-            _vertexBuffer = new VertexBuffer(device, VertexPositionColorTexture.VertexDeclaration, data.Vertices.Length, BufferUsage.WriteOnly);
+            _vertexBuffer = new VertexBuffer(device, TerrainVertex.VertexDeclaration, data.Vertices.Length, BufferUsage.WriteOnly);
             _vertexBuffer.SetData(data.Vertices);
             _indexBuffer = new IndexBuffer(device, IndexElementSize.ThirtyTwoBits, data.Indices.Length, BufferUsage.WriteOnly);
             _indexBuffer.SetData(data.Indices);
@@ -65,7 +78,7 @@ public class ChunkMesh : IDisposable
 
         if (data.LightIndices.Length > 0)
         {
-            _lightVertexBuffer = new VertexBuffer(device, VertexPositionColorTexture.VertexDeclaration, data.LightVertices.Length, BufferUsage.WriteOnly);
+            _lightVertexBuffer = new VertexBuffer(device, TerrainVertex.VertexDeclaration, data.LightVertices.Length, BufferUsage.WriteOnly);
             _lightVertexBuffer.SetData(data.LightVertices);
             _lightIndexBuffer = new IndexBuffer(device, IndexElementSize.ThirtyTwoBits, data.LightIndices.Length, BufferUsage.WriteOnly);
             _lightIndexBuffer.SetData(data.LightIndices);

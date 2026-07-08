@@ -45,6 +45,18 @@ public class ChunkManager : IDisposable
     public int LoadedChunkCount => _chunks.Count;
     public int PendingCount => _generating.Count + _meshing.Count;
 
+    /// <summary>Total mesh vertices across all passes — perf telemetry.</summary>
+    public int TotalVertexCount
+    {
+        get
+        {
+            int total = 0;
+            foreach (var mesh in _meshes.Values)
+                total += mesh.VertexCount;
+            return total;
+        }
+    }
+
     public ChunkManager(GraphicsDevice device, TerrainGenerator generator, WorldSave save)
     {
         _device = device;

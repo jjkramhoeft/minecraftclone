@@ -8,23 +8,30 @@ namespace MinecraftClone.Rendering;
 
 /// <summary>CPU-side mesh: safe to build on a worker thread, uploaded to the GPU by ChunkMesh.</summary>
 public record MeshData(
-    VertexPositionColorTexture[] Vertices, int[] Indices,
+    TerrainVertex[] Vertices, int[] Indices,
     VertexPositionColorTexture[] WaterVertices, int[] WaterIndices,
     VertexPositionColorTexture[] CutoutVertices, int[] CutoutIndices,
-    VertexPositionColorTexture[] LightVertices, int[] LightIndices)
+    TerrainVertex[] LightVertices, int[] LightIndices)
 {
     public bool IsEmpty => Indices.Length == 0 && WaterIndices.Length == 0
         && CutoutIndices.Length == 0 && LightIndices.Length == 0;
 }
 
 /// <summary>
-/// Naive culled meshing: one quad per block face that borders a non-solid block,
-/// with per-vertex ambient occlusion. Water goes into a separate vertex list so
-/// the renderer can draw it in a transparent pass after the opaque terrain.
-/// Vertices are in chunk-local coordinates; ChunkMesh translates to world
-/// position. Pure CPU work — no GraphicsDevice access, so it can run on worker
-/// threads. The outside sampler must handle diagonal excursions (AO reads
-/// corner neighbors), i.e. up to one chunk away in both X and Z at once.
+/// Greedy meshing with per-vertex ambient occlusion: coplanar opaque faces
+/// with the same tile merge into large quads when their AO and torch light
+/// are uniform (flat interiors — the bulk of all faces); faces with corner
+/// gradients stay 1x1 so lighting looks identical to the naive mesher. Merged
+/// quads carry block-unit UVs that TerrainEffect wraps per block, so the
+/// atlas tile repeats instead of stretching.
+///
+/// Water, plants, and glass keep their per-block special-case paths. Water
+/// goes into a separate vertex list so the renderer can draw it in a
+/// transparent pass after the opaque terrain. Vertices are in chunk-local
+/// coordinates; ChunkMesh translates to world position. Pure CPU work — no
+/// GraphicsDevice access, so it can run on worker threads. The outside
+/// sampler must handle diagonal excursions (AO reads corner neighbors), i.e.
+/// up to one chunk away in both X and Z at once.
 /// </summary>
 public static class ChunkMesher
 {
@@ -54,6 +61,19 @@ public static class ChunkMesher
         (0, 2), (0, 2), (0, 1), (0, 1), (1, 2), (1, 2),
     };
 
+    // Greedy sweep axes per face: A = the normal (slice) axis, P/Q = the two
+    // in-plane axes. P is always the texture-u axis and Q the texture-v axis
+    // (matches the UV assignment in FaceCorners/CornerLocalUV).
+    private static readonly (int A, int P, int Q)[] FaceSliceAxes =
+    {
+        (1, 0, 2), (1, 0, 2), (2, 0, 1), (2, 0, 1), (0, 2, 1), (0, 2, 1),
+    };
+
+    // Tile-local UV of each FaceCorners corner: (0,1)=bottom-left of the tile,
+    // (1,0)=top-right — the same orientation every face used pre-greedy.
+    private static readonly int[] CornerCu = { 0, 1, 1, 0 };
+    private static readonly int[] CornerCv = { 1, 1, 0, 0 };
+
     // Fake directional light: constant brightness per face orientation.
     private static readonly float[] FaceShade = { 1f, 0.5f, 0.8f, 0.8f, 0.65f, 0.65f };
 
@@ -61,6 +81,29 @@ public static class ChunkMesher
     private static readonly float[] AoFactor = { 0.55f, 0.7f, 0.85f, 1f };
 
     private const byte WaterAlpha = 160;
+
+    /// <summary>One cell of the greedy mask. Kind classifies how the face's
+    /// corner lighting varies, which decides the directions it may merge in
+    /// while staying pixel-identical to per-block quads: constant lighting
+    /// merges into 2D rects; lighting constant only along the texture-u axis
+    /// (e.g. a wall band dark at the ground, light at the top) merges into
+    /// u-strips; the v-symmetric case merges into v-strips.</summary>
+    private struct MaskCell
+    {
+        public const byte None = 0, Uniform = 1, UConst = 2, VConst = 3;
+
+        public byte Kind;
+        public ushort Tile;
+        public byte AoPacked;     // 4 corners x 2 bits
+        public uint TorchPacked;  // 4 corners x 8 bits
+    }
+
+    private static bool SameCell(in MaskCell a, in MaskCell b) =>
+        a.Kind == b.Kind && a.Tile == b.Tile
+        && a.AoPacked == b.AoPacked && a.TorchPacked == b.TorchPacked;
+
+    private static int AxisSize(int axis) =>
+        axis == 0 ? Chunk.SizeX : axis == 1 ? Chunk.SizeY : Chunk.SizeZ;
 
     /// <param name="chunk">The chunk to mesh.</param>
     /// <param name="getOutsideBlock">
@@ -71,13 +114,13 @@ public static class ChunkMesher
     public static MeshData Build(Chunk chunk, Func<int, int, int, BlockType> getOutsideBlock,
         Func<int, int, int, byte> getOutsideLight)
     {
-        var vertices = new List<VertexPositionColorTexture>();
+        var vertices = new List<TerrainVertex>();
         var indices = new List<int>();
         var waterVertices = new List<VertexPositionColorTexture>();
         var waterIndices = new List<int>();
         var cutoutVertices = new List<VertexPositionColorTexture>();
         var cutoutIndices = new List<int>();
-        var lightVertices = new List<VertexPositionColorTexture>();
+        var lightVertices = new List<TerrainVertex>();
         var lightIndices = new List<int>();
 
         BlockType Sample(int x, int y, int z) =>
@@ -85,6 +128,7 @@ public static class ChunkMesher
         byte SampleLight(int x, int y, int z) =>
             Chunk.InBounds(x, y, z) ? chunk.GetLight(x, y, z) : getOutsideLight(x, y, z);
 
+        // Pass 1: the per-block special cases (plants, water, glass).
         for (int y = 0; y < Chunk.SizeY; y++)
         {
             for (int z = 0; z < Chunk.SizeZ; z++)
@@ -103,7 +147,7 @@ public static class ChunkMesher
                         // Emitters glow: the same quads at full brightness in
                         // the max-blended light pass keep them bright at night.
                         if (BlockInfo.GetLightEmission(type) > 0)
-                            AddCrossQuads(lightVertices, lightIndices, x, y, z, type, Color.White);
+                            AddCrossQuadsLight(lightVertices, lightIndices, x, y, z, type, Color.White);
                         continue;
                     }
 
@@ -123,19 +167,119 @@ public static class ChunkMesher
                             var (nx, ny, nz) = FaceNormals[face];
                             var neighbor = Sample(x + nx, y + ny, z + nz);
                             if (!BlockInfo.IsOpaque(neighbor) && neighbor != BlockType.Glass)
-                                AddFace(cutoutVertices, cutoutIndices, lightVertices, lightIndices,
+                                AddGlassFace(cutoutVertices, cutoutIndices, lightVertices, lightIndices,
                                     x, y, z, face, type, Sample, SampleLight);
                         }
-                        continue;
                     }
+                }
+            }
+        }
 
-                    for (int face = 0; face < 6; face++)
+        // Pass 2: greedy sweep over the ordinary opaque solids, one face
+        // direction at a time, slice by slice along its normal.
+        var mask = new MaskCell[Chunk.SizeX * Chunk.SizeY]; // sized for the largest slice
+        Span<int> ao = stackalloc int[4];
+        Span<byte> torch = stackalloc byte[4];
+
+        for (int face = 0; face < 6; face++)
+        {
+            var (aAxis, pAxis, qAxis) = FaceSliceAxes[face];
+            int sizeA = AxisSize(aAxis), sizeP = AxisSize(pAxis), sizeQ = AxisSize(qAxis);
+            var (nx, ny, nz) = FaceNormals[face];
+
+            for (int slice = 0; slice < sizeA; slice++)
+            {
+                bool any = false;
+                for (int j = 0; j < sizeQ; j++)
+                {
+                    for (int i = 0; i < sizeP; i++)
                     {
-                        var (nx, ny, nz) = FaceNormals[face];
+                        mask[i + j * sizeP] = default;
+
+                        int x = aAxis == 0 ? slice : pAxis == 0 ? i : j;
+                        int y = aAxis == 1 ? slice : pAxis == 1 ? i : j;
+                        int z = aAxis == 2 ? slice : pAxis == 2 ? i : j;
+
+                        var type = chunk.GetBlock(x, y, z);
+                        if (type == BlockType.Air || BlockInfo.IsPlant(type)
+                            || BlockInfo.IsWater(type) || type == BlockType.Glass)
+                            continue;
                         var neighbor = Sample(x + nx, y + ny, z + nz);
-                        if (!BlockInfo.IsOpaque(neighbor))
-                            AddFace(vertices, indices, lightVertices, lightIndices,
-                                x, y, z, face, type, Sample, SampleLight);
+                        if (BlockInfo.IsOpaque(neighbor))
+                            continue;
+
+                        CornerLighting(x, y, z, face, Sample, SampleLight, ao, torch);
+                        int tile = BlockInfo.GetFaceTile(type, (BlockFace)face);
+
+                        // Corners: 0=BL, 1=BR, 2=TR, 3=TL in texture space.
+                        bool uConst = ao[0] == ao[1] && ao[3] == ao[2]
+                            && torch[0] == torch[1] && torch[3] == torch[2];
+                        bool vConst = ao[0] == ao[3] && ao[1] == ao[2]
+                            && torch[0] == torch[3] && torch[1] == torch[2];
+                        byte kind = uConst && vConst ? MaskCell.Uniform
+                            : uConst ? MaskCell.UConst
+                            : vConst ? MaskCell.VConst
+                            : MaskCell.None;
+
+                        if (kind == MaskCell.None)
+                        {
+                            // Lighting varies in both directions — merging
+                            // would visibly change the gradient. Emit as-is.
+                            EmitFace(vertices, indices, lightVertices, lightIndices,
+                                face, x, y, z, 1, 1, tile, ao, torch);
+                        }
+                        else
+                        {
+                            mask[i + j * sizeP] = new MaskCell
+                            {
+                                Kind = kind,
+                                Tile = (ushort)tile,
+                                AoPacked = (byte)(ao[0] | ao[1] << 2 | ao[2] << 4 | ao[3] << 6),
+                                TorchPacked = (uint)(torch[0] | torch[1] << 8 | torch[2] << 16 | torch[3] << 24),
+                            };
+                            any = true;
+                        }
+                    }
+                }
+                if (!any)
+                    continue;
+
+                for (int j = 0; j < sizeQ; j++)
+                {
+                    for (int i = 0; i < sizeP; i++)
+                    {
+                        var cell = mask[i + j * sizeP];
+                        if (cell.Kind == MaskCell.None)
+                            continue;
+
+                        // V-strips can't grow in u, u-strips can't grow in v —
+                        // the direction the lighting varies in must stay one
+                        // block wide for the gradient to survive merging.
+                        int width = 1;
+                        if (cell.Kind != MaskCell.VConst)
+                            while (i + width < sizeP && SameCell(cell, mask[i + width + j * sizeP]))
+                                width++;
+                        int height = 1;
+                        if (cell.Kind != MaskCell.UConst)
+                            while (j + height < sizeQ && RowMatches(mask, cell, i, j + height, width, sizeP))
+                                height++;
+                        for (int jj = j; jj < j + height; jj++)
+                            for (int ii = i; ii < i + width; ii++)
+                                mask[ii + jj * sizeP].Kind = MaskCell.None;
+
+                        int x = aAxis == 0 ? slice : pAxis == 0 ? i : j;
+                        int y = aAxis == 1 ? slice : pAxis == 1 ? i : j;
+                        int z = aAxis == 2 ? slice : pAxis == 2 ? i : j;
+
+                        for (int c = 0; c < 4; c++)
+                        {
+                            ao[c] = (cell.AoPacked >> (2 * c)) & 3;
+                            torch[c] = (byte)(cell.TorchPacked >> (8 * c));
+                        }
+                        EmitFace(vertices, indices, lightVertices, lightIndices,
+                            face, x, y, z, width, height, cell.Tile, ao, torch);
+
+                        i += width - 1;
                     }
                 }
             }
@@ -146,6 +290,109 @@ public static class ChunkMesher
             waterVertices.ToArray(), waterIndices.ToArray(),
             cutoutVertices.ToArray(), cutoutIndices.ToArray(),
             lightVertices.ToArray(), lightIndices.ToArray());
+    }
+
+    private static bool RowMatches(MaskCell[] mask, in MaskCell cell, int i, int j, int width, int sizeP)
+    {
+        for (int ii = i; ii < i + width; ii++)
+            if (!SameCell(cell, mask[ii + j * sizeP]))
+                return false;
+        return true;
+    }
+
+    /// <summary>Per-corner ambient occlusion and smooth torch light for one
+    /// face — the three blocks diagonally adjacent to each vertex, one layer
+    /// out along the face normal.</summary>
+    private static void CornerLighting(int bx, int by, int bz, int face,
+        Func<int, int, int, BlockType> sample, Func<int, int, int, byte> sampleLight,
+        Span<int> ao, Span<byte> torch)
+    {
+        var (nx, ny, nz) = FaceNormals[face];
+        var (uAxis, vAxis) = FaceTangents[face];
+        var corners = FaceCorners[face];
+
+        for (int i = 0; i < 4; i++)
+        {
+            int su = 2 * Component(corners[i], uAxis) - 1;
+            int sv = 2 * Component(corners[i], vAxis) - 1;
+
+            var front = (bx + nx, by + ny, bz + nz);
+            var side1 = Offset(front, uAxis, su);
+            var side2 = Offset(front, vAxis, sv);
+            var corner = Offset(side1, vAxis, sv);
+            bool s1 = BlockInfo.IsSolid(sample(side1.X, side1.Y, side1.Z));
+            bool s2 = BlockInfo.IsSolid(sample(side2.X, side2.Y, side2.Z));
+            bool sc = BlockInfo.IsSolid(sample(corner.X, corner.Y, corner.Z));
+
+            ao[i] = s1 && s2 ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (sc ? 1 : 0));
+
+            // Smooth block light: the same four cells that decide AO decide
+            // the vertex's torch light (solid cells hold 0, dimming corners).
+            int light = sampleLight(front.Item1, front.Item2, front.Item3)
+                + sampleLight(side1.X, side1.Y, side1.Z)
+                + sampleLight(side2.X, side2.Y, side2.Z)
+                + sampleLight(corner.X, corner.Y, corner.Z);
+            torch[i] = (byte)(light / 4);
+        }
+    }
+
+    /// <summary>Emits one terrain quad covering width x height blocks in the
+    /// face's in-plane P/Q axes, into the opaque mesh and (when torch-lit)
+    /// the max-blended light mesh.</summary>
+    private static void EmitFace(List<TerrainVertex> vertices, List<int> indices,
+        List<TerrainVertex> lightVertices, List<int> lightIndices,
+        int face, int bx, int by, int bz, int width, int height, int tile,
+        ReadOnlySpan<int> ao, ReadOnlySpan<byte> torch)
+    {
+        var (_, pAxis, qAxis) = FaceSliceAxes[face];
+        Span<float> extent = stackalloc float[] { 1f, 1f, 1f };
+        extent[pAxis] = width;
+        extent[qAxis] = height;
+
+        var uv = TextureAtlas.GetUVBounds(tile);
+        var origin = new Vector2(uv.X, uv.Y);
+        float shade = FaceShade[face];
+        var corners = FaceCorners[face];
+        var blockPos = new Vector3(bx, by, bz);
+
+        int baseIndex = vertices.Count;
+        int maxTorch = 0;
+        Span<Vector3> positions = stackalloc Vector3[4];
+        Span<Vector2> locals = stackalloc Vector2[4];
+        for (int i = 0; i < 4; i++)
+        {
+            positions[i] = blockPos + new Vector3(
+                corners[i].X * extent[0], corners[i].Y * extent[1], corners[i].Z * extent[2]);
+            locals[i] = new Vector2(CornerCu[i] * width, CornerCv[i] * height);
+            maxTorch = Math.Max(maxTorch, torch[i]);
+
+            byte brightness = (byte)(255 * shade * AoFactor[ao[i]]);
+            vertices.Add(new TerrainVertex(positions[i],
+                new Color(brightness, brightness, brightness), locals[i], origin));
+        }
+
+        // Split the quad along the diagonal that connects the less-occluded
+        // pair, otherwise AO gradients show a directional artifact.
+        Span<int> winding = ao[0] + ao[2] >= ao[1] + ao[3]
+            ? stackalloc[] { 0, 1, 2, 0, 2, 3 }
+            : stackalloc[] { 1, 2, 3, 1, 3, 0 };
+        foreach (int offset in winding)
+            indices.Add(baseIndex + offset);
+
+        if (maxTorch == 0)
+            return;
+
+        // Duplicate the face into the light mesh: vertex color carries the
+        // torch light level; the renderer max-blends it over the day-lit pass.
+        int lightBase = lightVertices.Count;
+        for (int i = 0; i < 4; i++)
+        {
+            byte brightness = (byte)(255 * (torch[i] / 15f) * AoFactor[ao[i]]);
+            lightVertices.Add(new TerrainVertex(positions[i],
+                new Color(brightness, brightness, brightness), locals[i], origin));
+        }
+        foreach (int offset in winding)
+            lightIndices.Add(lightBase + offset);
     }
 
     // The two diagonal quads of a flower, inset from the block edges. Drawn
@@ -178,8 +425,34 @@ public static class ChunkMesher
         }
     }
 
-    private static void AddFace(List<VertexPositionColorTexture> vertices, List<int> indices,
-        List<VertexPositionColorTexture> lightVertices, List<int> lightIndices,
+    /// <summary>Same crossed quads in TerrainVertex form for the light mesh
+    /// (unit local UVs — a cross quad is never merged).</summary>
+    private static void AddCrossQuadsLight(List<TerrainVertex> vertices, List<int> indices, int bx, int by, int bz, BlockType type, Color color)
+    {
+        var uv = TextureAtlas.GetUVBounds(BlockInfo.GetFaceTile(type, BlockFace.South));
+        var origin = new Vector2(uv.X, uv.Y);
+        var blockPos = new Vector3(bx, by, bz);
+
+        foreach (var quad in CrossQuads)
+        {
+            int baseIndex = vertices.Count;
+            for (int i = 0; i < 4; i++)
+                vertices.Add(new TerrainVertex(blockPos + quad[i], color,
+                    new Vector2(CornerCu[i], CornerCv[i]), origin));
+
+            indices.Add(baseIndex + 0);
+            indices.Add(baseIndex + 1);
+            indices.Add(baseIndex + 2);
+            indices.Add(baseIndex + 0);
+            indices.Add(baseIndex + 2);
+            indices.Add(baseIndex + 3);
+        }
+    }
+
+    /// <summary>Glass faces: alpha-tested cutout quads (absolute atlas UVs),
+    /// with a TerrainVertex duplicate in the light mesh when torch-lit.</summary>
+    private static void AddGlassFace(List<VertexPositionColorTexture> vertices, List<int> indices,
+        List<TerrainVertex> lightVertices, List<int> lightIndices,
         int bx, int by, int bz, int face, BlockType type,
         Func<int, int, int, BlockType> sample, Func<int, int, int, byte> sampleLight)
     {
@@ -190,48 +463,22 @@ public static class ChunkMesher
             new(uv.X, uv.W), new(uv.Z, uv.W), new(uv.Z, uv.Y), new(uv.X, uv.Y),
         };
 
-        var (nx, ny, nz) = FaceNormals[face];
-        var (uAxis, vAxis) = FaceTangents[face];
-        var blockPos = new Vector3(bx, by, bz);
-        var corners = FaceCorners[face];
-
-        int baseIndex = vertices.Count;
         Span<int> ao = stackalloc int[4];
         Span<byte> torch = stackalloc byte[4];
+        CornerLighting(bx, by, bz, face, sample, sampleLight, ao, torch);
+
+        var blockPos = new Vector3(bx, by, bz);
+        var corners = FaceCorners[face];
+        int baseIndex = vertices.Count;
         int maxTorch = 0;
         for (int i = 0; i < 4; i++)
         {
-            // The three blocks diagonally adjacent to this vertex, one layer
-            // out along the face normal, decide its ambient occlusion.
-            int su = 2 * Component(corners[i], uAxis) - 1;
-            int sv = 2 * Component(corners[i], vAxis) - 1;
-
-            var front = (bx + nx, by + ny, bz + nz);
-            var side1 = Offset(front, uAxis, su);
-            var side2 = Offset(front, vAxis, sv);
-            var corner = Offset(side1, vAxis, sv);
-            bool s1 = BlockInfo.IsSolid(sample(side1.X, side1.Y, side1.Z));
-            bool s2 = BlockInfo.IsSolid(sample(side2.X, side2.Y, side2.Z));
-            bool sc = BlockInfo.IsSolid(sample(corner.X, corner.Y, corner.Z));
-
-            ao[i] = s1 && s2 ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (sc ? 1 : 0));
-
-            // Smooth block light: the same four cells that decide AO decide
-            // the vertex's torch light (solid cells hold 0, dimming corners).
-            int light = sampleLight(front.Item1, front.Item2, front.Item3)
-                + sampleLight(side1.X, side1.Y, side1.Z)
-                + sampleLight(side2.X, side2.Y, side2.Z)
-                + sampleLight(corner.X, corner.Y, corner.Z);
-            torch[i] = (byte)(light / 4);
             maxTorch = Math.Max(maxTorch, torch[i]);
-
             byte brightness = (byte)(255 * shade * AoFactor[ao[i]]);
             vertices.Add(new VertexPositionColorTexture(
                 blockPos + corners[i], new Color(brightness, brightness, brightness), uvs[i]));
         }
 
-        // Split the quad along the diagonal that connects the less-occluded
-        // pair, otherwise AO gradients show a directional artifact.
         Span<int> winding = ao[0] + ao[2] >= ao[1] + ao[3]
             ? stackalloc[] { 0, 1, 2, 0, 2, 3 }
             : stackalloc[] { 1, 2, 3, 1, 3, 0 };
@@ -241,14 +488,14 @@ public static class ChunkMesher
         if (maxTorch == 0)
             return;
 
-        // Duplicate the face into the light mesh: vertex color carries the
-        // torch light level; the renderer max-blends it over the day-lit pass.
+        var origin = new Vector2(uv.X, uv.Y);
         int lightBase = lightVertices.Count;
         for (int i = 0; i < 4; i++)
         {
             byte brightness = (byte)(255 * (torch[i] / 15f) * AoFactor[ao[i]]);
-            lightVertices.Add(new VertexPositionColorTexture(
-                blockPos + corners[i], new Color(brightness, brightness, brightness), uvs[i]));
+            lightVertices.Add(new TerrainVertex(blockPos + corners[i],
+                new Color(brightness, brightness, brightness),
+                new Vector2(CornerCu[i], CornerCv[i]), origin));
         }
         foreach (int offset in winding)
             lightIndices.Add(lightBase + offset);

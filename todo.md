@@ -25,8 +25,12 @@ Minecraft itself as the reference.
 
 ## Performance headroom (fine today, will bite as the world grows)
 
-- [ ] **Greedy meshing** in `Rendering/ChunkMesher.cs` — merges coplanar faces,
+- [x] **Greedy meshing** in `Rendering/ChunkMesher.cs` — merges coplanar faces,
       typically 5–10× fewer vertices; the AO-aware variant is well documented.
+      *(Done lighting-exact: only merges that reproduce per-block AO/torch
+      gradients bit-for-bit. ~22% fewer vertices on this terrain — the rest is
+      cave walls whose AO tuples are all unique; measured the unrestricted
+      merge too and it gains nothing more.)*
 - [ ] **Raise render distance** (`LoadRadius 8` = 128 blocks is modest; Craft ships
       with much larger visible ranges). Likely needs greedy meshing first, plus fog
       pushed out to match.

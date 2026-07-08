@@ -17,7 +17,7 @@ public class DebugOverlay
     public bool Visible;
 
     /// <summary>Rebuilt once per second; null entries are skipped.</summary>
-    public readonly string[] Lines = new string[5];
+    public readonly string[] Lines = new string[6];
 
     private readonly Texture2D _pixel;
 

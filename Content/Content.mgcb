@@ -13,3 +13,8 @@
 
 #---------------------------------- Content ---------------------------------#
 
+#begin TerrainEffect.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/build:TerrainEffect.fx
+

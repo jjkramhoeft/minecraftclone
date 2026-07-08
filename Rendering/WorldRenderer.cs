@@ -5,23 +5,35 @@ using Microsoft.Xna.Framework.Graphics;
 namespace MinecraftClone.Rendering;
 
 /// <summary>
-/// Draws all chunk meshes with a shared effect: an opaque pass, then a
-/// transparent water pass. Chunks outside the view frustum are skipped, and
-/// distance fog in the sky color hides chunk pop-in at the load radius.
+/// Draws all chunk meshes: an opaque terrain pass and a torch-light pass with
+/// the custom TerrainEffect (greedy quads need per-block texture wrapping),
+/// then cutout and transparent water passes with the stock effects. Chunks
+/// outside the view frustum are skipped, and distance fog in the sky color
+/// hides chunk pop-in at the load radius.
 /// </summary>
 public class WorldRenderer
 {
     private const float FogStart = 70f;
     private const float FogEnd = 122f; // just inside the mesh radius (8 chunks = 128 blocks)
 
-    private readonly BasicEffect _effect;
+    private static readonly Vector3 TorchTint = new(1f, 0.85f, 0.6f);
+
+    private readonly Effect _terrainEffect;
+    private readonly EffectParameter _terrainWorld;
+    private readonly EffectParameter _terrainViewProjection;
+    private readonly EffectParameter _terrainCameraPosition;
+    private readonly EffectParameter _terrainDiffuse;
+    private readonly EffectParameter _terrainFogColor;
+    private readonly BasicEffect _effect;          // water
     private readonly AlphaTestEffect _cutoutEffect;
-    private readonly BasicEffect _lightEffect;
     private readonly List<ChunkMesh> _visible = new();
+
+    private Vector3 _light = Vector3.One;
+    private Vector3 _sky = Color.CornflowerBlue.ToVector3();
 
     // Torch light must survive night dimming, so it goes in a second pass
     // blended with max(): the frame keeps whichever is brighter, day light or
-    // torch light — the classic max(skyTint, blockLight) without a custom shader.
+    // torch light — the classic max(skyTint, blockLight) without extra passes.
     private static readonly BlendState MaxBlend = new()
     {
         ColorBlendFunction = BlendFunction.Max,
@@ -32,8 +44,21 @@ public class WorldRenderer
         AlphaDestinationBlend = Blend.One,
     };
 
-    public WorldRenderer(GraphicsDevice device, TextureAtlas atlas)
+    public WorldRenderer(GraphicsDevice device, TextureAtlas atlas, Effect terrainEffect)
     {
+        _terrainEffect = terrainEffect;
+        _terrainEffect.Parameters["AtlasTexture"].SetValue(atlas.Texture);
+        _terrainEffect.Parameters["FogStart"].SetValue(FogStart);
+        _terrainEffect.Parameters["FogEnd"].SetValue(FogEnd);
+        // All tiles sample the same inset span (see TextureAtlas.GetUVBounds).
+        _terrainEffect.Parameters["TileSpan"].SetValue(
+            new Vector2((TextureAtlas.TileSize - 1f) / TextureAtlas.AtlasSize));
+        _terrainWorld = _terrainEffect.Parameters["World"];
+        _terrainViewProjection = _terrainEffect.Parameters["ViewProjection"];
+        _terrainCameraPosition = _terrainEffect.Parameters["CameraPosition"];
+        _terrainDiffuse = _terrainEffect.Parameters["DiffuseColor"];
+        _terrainFogColor = _terrainEffect.Parameters["FogColor"];
+
         _effect = new BasicEffect(device)
         {
             VertexColorEnabled = true,
@@ -59,37 +84,21 @@ public class WorldRenderer
             FogStart = FogStart,
             FogEnd = FogEnd,
         };
-
-        // Fog fades to black here so distant torch light contributes nothing
-        // (max with 0 is a no-op); the warm tint comes from DiffuseColor.
-        _lightEffect = new BasicEffect(device)
-        {
-            VertexColorEnabled = true,
-            LightingEnabled = false,
-            TextureEnabled = true,
-            Texture = atlas.Texture,
-            DiffuseColor = new Vector3(1f, 0.85f, 0.6f),
-            FogEnabled = true,
-            FogColor = Vector3.Zero,
-            FogStart = FogStart,
-            FogEnd = FogEnd,
-        };
     }
 
     /// <summary>Per-frame scene light (day/night dimming) and fog/sky color.</summary>
     public void SetEnvironment(Vector3 light, Color sky)
     {
+        _light = light;
+        _sky = sky.ToVector3();
         _effect.DiffuseColor = light;
-        _effect.FogColor = sky.ToVector3();
+        _effect.FogColor = _sky;
         _cutoutEffect.DiffuseColor = light;
-        _cutoutEffect.FogColor = sky.ToVector3();
+        _cutoutEffect.FogColor = _sky;
     }
 
     public void Draw(GraphicsDevice device, FirstPersonCamera camera, IEnumerable<ChunkMesh> meshes)
     {
-        _effect.View = camera.View;
-        _effect.Projection = camera.Projection;
-
         var frustum = new BoundingFrustum(camera.View * camera.Projection);
         _visible.Clear();
         foreach (var mesh in meshes)
@@ -101,16 +110,19 @@ public class WorldRenderer
         device.RasterizerState = RasterizerState.CullCounterClockwise;
         device.SamplerStates[0] = SamplerState.PointClamp; // crisp pixels, no atlas bleed
 
+        _terrainViewProjection.SetValue(camera.View * camera.Projection);
+        _terrainCameraPosition.SetValue(camera.Position);
+        _terrainDiffuse.SetValue(_light);
+        _terrainFogColor.SetValue(_sky);
+
+        var terrainPass = _terrainEffect.CurrentTechnique.Passes[0];
         foreach (var mesh in _visible)
         {
             if (!mesh.HasOpaque)
                 continue;
-            _effect.World = mesh.World;
-            foreach (var pass in _effect.CurrentTechnique.Passes)
-            {
-                pass.Apply();
-                mesh.DrawOpaque(device);
-            }
+            _terrainWorld.SetValue(mesh.World);
+            terrainPass.Apply();
+            mesh.DrawOpaque(device);
         }
 
         // Cutout pass (flowers): depth-writing like opaque, but double-sided.
@@ -133,22 +145,21 @@ public class WorldRenderer
         // Torch-light pass: re-draws lit faces (and glowing torches) with
         // max() blending on top of the day-lit result. Depth-read with the
         // LessEqual default lets the duplicate geometry pass; CullNone keeps
-        // the torch cross-quads double-sided.
-        _lightEffect.View = camera.View;
-        _lightEffect.Projection = camera.Projection;
+        // the torch cross-quads double-sided. Fog fades to black so distant
+        // torch light contributes nothing (max with 0 is a no-op); the warm
+        // tint comes from the diffuse color.
         device.BlendState = MaxBlend;
         device.DepthStencilState = DepthStencilState.DepthRead;
+        _terrainDiffuse.SetValue(TorchTint);
+        _terrainFogColor.SetValue(Vector3.Zero);
 
         foreach (var mesh in _visible)
         {
             if (!mesh.HasLight)
                 continue;
-            _lightEffect.World = mesh.World;
-            foreach (var pass in _lightEffect.CurrentTechnique.Passes)
-            {
-                pass.Apply();
-                mesh.DrawLight(device);
-            }
+            _terrainWorld.SetValue(mesh.World);
+            terrainPass.Apply();
+            mesh.DrawLight(device);
         }
 
         device.RasterizerState = RasterizerState.CullCounterClockwise;
@@ -157,6 +168,8 @@ public class WorldRenderer
         // water faces never punch holes in each other.
         device.BlendState = BlendState.NonPremultiplied;
         device.DepthStencilState = DepthStencilState.DepthRead;
+        _effect.View = camera.View;
+        _effect.Projection = camera.Projection;
 
         foreach (var mesh in _visible)
         {

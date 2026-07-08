@@ -217,7 +217,7 @@ public class MainGame : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _atlas = new TextureAtlas(GraphicsDevice);
-        _worldRenderer = new WorldRenderer(GraphicsDevice, _atlas);
+        _worldRenderer = new WorldRenderer(GraphicsDevice, _atlas, Content.Load<Effect>("TerrainEffect"));
         _blockHighlight = new BlockHighlight(GraphicsDevice);
         _breakingOverlay = new BreakingOverlay(GraphicsDevice, _atlas);
         _fallingBlocks = new FallingBlocks();
@@ -510,11 +510,19 @@ public class MainGame : Game
 
     private void PrintSmokeSummary()
     {
+        int opaque = 0, water = 0, cutout = 0, lightV = 0;
+        foreach (var m in _chunkManager.Meshes)
+        {
+            opaque += m.OpaqueVertexCount; water += m.WaterVertexCount;
+            cutout += m.CutoutVertexCount; lightV += m.LightVertexCount;
+        }
+        Console.WriteLine($"SMOKE VERTS — opaque {opaque / 1000}k, water {water / 1000}k, cutout {cutout / 1000}k, light {lightV / 1000}k");
         var pos = _player.Position;
         double fps = _smokeElapsed > 0 ? _smokeDraws / _smokeElapsed : 0;
         Console.WriteLine(
             $"SMOKE OK — {_smokeUpdates} updates / {_smokeDraws} draws in {_smokeElapsed:0.0}s ({fps:0} fps) | " +
             $"{_chunkManager.LoadedChunkCount} chunks loaded ({_chunkManager.PendingCount} pending) | " +
+            $"{_chunkManager.TotalVertexCount / 1000}k mesh vertices | " +
             $"player at {pos.X:0.#}, {pos.Y:0.#}, {pos.Z:0.#}");
     }
 
@@ -612,6 +620,7 @@ public class MainGame : Game
             _debugOverlay.Lines[2] = $"CHUNKS: {_chunkManager.LoadedChunkCount} ({_chunkManager.PendingCount} PENDING)";
             _debugOverlay.Lines[3] = $"YAW: {MathHelper.ToDegrees(_camera.Yaw):0} PITCH: {MathHelper.ToDegrees(_camera.Pitch):0}";
             _debugOverlay.Lines[4] = $"TIME: {_dayNight.TimeOfDay:0.00}";
+            _debugOverlay.Lines[5] = $"VERTS: {_chunkManager.TotalVertexCount / 1000}K";
         }
 
         _frames = 0;
