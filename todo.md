@@ -34,8 +34,10 @@ Minecraft itself as the reference.
 - [ ] **Raise render distance** (`LoadRadius 8` = 128 blocks is modest; Craft ships
       with much larger visible ranges). Likely needs greedy meshing first, plus fog
       pushed out to match.
-- [ ] **Sub-column meshing or empty-section skip.** Chunks are full 16×128×16 meshes;
+- [x] **Sub-column meshing or empty-section skip.** Chunks are full 16×128×16 meshes;
       splitting into 16³ sections culls better vertically once caves exist.
+      *(Done as tight per-mesh Y bounds for frustum culling — same culling win
+      as sections without splitting draw calls; world-bottom faces skipped too.)*
 
 ## Small polish (grab-bag)
 

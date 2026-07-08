@@ -44,7 +44,9 @@ public class ChunkMesh : IDisposable
     {
         Coord = coord;
         var origin = new Vector3(coord.X * Chunk.SizeX, 0f, coord.Z * Chunk.SizeZ);
-        Bounds = new BoundingBox(origin, origin + new Vector3(Chunk.SizeX, Chunk.SizeY, Chunk.SizeZ));
+        Bounds = new BoundingBox(
+            new Vector3(origin.X, data.MinY, origin.Z),
+            new Vector3(origin.X + Chunk.SizeX, data.MaxY, origin.Z + Chunk.SizeZ));
         VertexCount = data.Vertices.Length + data.WaterVertices.Length
             + data.CutoutVertices.Length + data.LightVertices.Length;
         OpaqueVertexCount = data.Vertices.Length;

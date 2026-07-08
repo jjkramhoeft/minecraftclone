@@ -11,7 +11,8 @@ public record MeshData(
     TerrainVertex[] Vertices, int[] Indices,
     VertexPositionColorTexture[] WaterVertices, int[] WaterIndices,
     VertexPositionColorTexture[] CutoutVertices, int[] CutoutIndices,
-    TerrainVertex[] LightVertices, int[] LightIndices)
+    TerrainVertex[] LightVertices, int[] LightIndices,
+    float MinY, float MaxY)
 {
     public bool IsEmpty => Indices.Length == 0 && WaterIndices.Length == 0
         && CutoutIndices.Length == 0 && LightIndices.Length == 0;
@@ -187,7 +188,10 @@ public static class ChunkMesher
             int sizeA = AxisSize(aAxis), sizeP = AxisSize(pAxis), sizeQ = AxisSize(qAxis);
             var (nx, ny, nz) = FaceNormals[face];
 
-            for (int slice = 0; slice < sizeA; slice++)
+            // Bottom faces at y=0 border the void below the world — no camera
+            // can ever see them, so don't mesh them at all.
+            int firstSlice = face == (int)BlockFace.Bottom ? 1 : 0;
+            for (int slice = firstSlice; slice < sizeA; slice++)
             {
                 bool any = false;
                 for (int j = 0; j < sizeQ; j++)
@@ -285,11 +289,22 @@ public static class ChunkMesher
             }
         }
 
+        // Tight vertical bounds across all passes, so ChunkMesh's frustum box
+        // hugs the geometry instead of spanning the full 0..SizeY column.
+        float minY = float.MaxValue, maxY = float.MinValue;
+        foreach (var v in vertices) { minY = Math.Min(minY, v.Position.Y); maxY = Math.Max(maxY, v.Position.Y); }
+        foreach (var v in lightVertices) { minY = Math.Min(minY, v.Position.Y); maxY = Math.Max(maxY, v.Position.Y); }
+        foreach (var v in waterVertices) { minY = Math.Min(minY, v.Position.Y); maxY = Math.Max(maxY, v.Position.Y); }
+        foreach (var v in cutoutVertices) { minY = Math.Min(minY, v.Position.Y); maxY = Math.Max(maxY, v.Position.Y); }
+        if (minY > maxY)
+            minY = maxY = 0f;
+
         return new MeshData(
             vertices.ToArray(), indices.ToArray(),
             waterVertices.ToArray(), waterIndices.ToArray(),
             cutoutVertices.ToArray(), cutoutIndices.ToArray(),
-            lightVertices.ToArray(), lightIndices.ToArray());
+            lightVertices.ToArray(), lightIndices.ToArray(),
+            minY, maxY);
     }
 
     private static bool RowMatches(MaskCell[] mask, in MaskCell cell, int i, int j, int width, int sizeP)
