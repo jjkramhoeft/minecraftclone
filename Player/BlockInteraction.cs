@@ -66,7 +66,7 @@ public class BlockInteraction
             ? hit
             : null;
 
-        if (!allowInput || Target is not { } target)
+        if (!allowInput)
         {
             _progress = 0f;
             return;
@@ -75,6 +75,22 @@ public class BlockInteraction
         bool leftHeld = mouse.LeftButton == ButtonState.Pressed;
         bool leftEdge = leftHeld && previousMouse.LeftButton == ButtonState.Released;
         bool rightEdge = mouse.RightButton == ButtonState.Pressed && previousMouse.RightButton == ButtonState.Released;
+
+        // Buckets target the liquid itself, so they work without (and past) a
+        // solid Target — handled before the ordinary mine/place flow.
+        var held = _inventory.SelectedStack.Item;
+        if (rightEdge && !leftHeld && held is ItemType.Bucket or ItemType.WaterBucket)
+        {
+            _progress = 0f;
+            UseBucket(camera, held);
+            return;
+        }
+
+        if (Target is not { } target)
+        {
+            _progress = 0f;
+            return;
+        }
 
         if (leftHeld)
         {
@@ -159,6 +175,53 @@ public class BlockInteraction
             if (drop != ItemType.None)
                 _drops.Spawn(drop, target.X, target.Y, target.Z);
         }
+    }
+
+    /// <summary>Empty bucket: scoop the first water source the crosshair ray
+    /// touches. Full bucket: pour a source into the hit water cell or the cell
+    /// in front of the hit face. Interactable blocks still capture the click.</summary>
+    private void UseBucket(FirstPersonCamera camera, ItemType held)
+    {
+        if (!VoxelRaycaster.Cast(_world, _player.EyePosition, camera.Forward, Reach, out var hit, includeWater: true))
+            return;
+        var hitType = _world.GetBlock(hit.X, hit.Y, hit.Z);
+
+        if (BlockInfo.IsInteractable(hitType)
+            && UseBlock?.Invoke(hit.X, hit.Y, hit.Z, hitType) == true)
+            return;
+
+        if (held == ItemType.Bucket)
+        {
+            // Only true sources are worth a bucket; flow cells just splash.
+            if (hitType != BlockType.Water)
+                return;
+            _world.SetBlock(hit.X, hit.Y, hit.Z, BlockType.Air);
+            _blockUpdater.NotifyBlockChanged(hit.X, hit.Y, hit.Z);
+            _inventory[_inventory.SelectedIndex] = new ItemStack(ItemType.WaterBucket, 1);
+            ActionPerformed?.Invoke();
+            BlockBroken?.Invoke(BlockType.Water);
+            return;
+        }
+
+        int x = hit.X, y = hit.Y, z = hit.Z;
+        if (!BlockInfo.IsWater(hitType))
+        {
+            if (hit.NormalX == 0 && hit.NormalY == 0 && hit.NormalZ == 0)
+                return;
+            x += hit.NormalX;
+            y += hit.NormalY;
+            z += hit.NormalZ;
+        }
+        var cell = _world.GetBlock(x, y, z);
+        if (cell == BlockType.Water || (cell != BlockType.Air && !BlockInfo.IsWater(cell)))
+            return; // occupied, or already a source — don't waste the bucket
+        if (!_world.IsChunkLoaded(ChunkManager.ToChunkCoord(new Vector3(x, 0, z))))
+            return;
+        _world.SetBlock(x, y, z, BlockType.Water);
+        _blockUpdater.NotifyBlockChanged(x, y, z);
+        _inventory[_inventory.SelectedIndex] = new ItemStack(ItemType.Bucket, 1);
+        ActionPerformed?.Invoke();
+        BlockPlaced?.Invoke(BlockType.Water);
     }
 
     private void TryPlace(RaycastHit target)

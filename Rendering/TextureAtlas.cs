@@ -72,6 +72,8 @@ public class TextureAtlas
         DrawGlass(pixels);
         DrawChest(pixels, BlockInfo.TileChestSide, latch: false);
         DrawChest(pixels, BlockInfo.TileChestFront, latch: true);
+        DrawBucket(pixels, BlockInfo.TileBucket, filled: false);
+        DrawBucket(pixels, BlockInfo.TileWaterBucket, filled: true);
 
         Texture = new Texture2D(device, AtlasSize, AtlasSize);
         Texture.SetData(pixels);
@@ -415,6 +417,43 @@ public class TextureAtlas
     }
 
     /// <summary>Item icon: a metal bar with a highlighted top edge.</summary>
+    /// <summary>Bucket icon: a tapered tin body with a handle arc; the filled
+    /// variant shows water at the brim.</summary>
+    private static void DrawBucket(Color[] pixels, int tile, bool filled)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                SetPixel(pixels, tile, x, y, Color.Transparent);
+
+        var metal = new Color(150, 150, 158);
+        var edge = new Color(100, 100, 110);
+        for (int y = 6; y <= 13; y++)
+        {
+            int inset = 3 + (y - 6) / 4;
+            for (int x = inset; x <= 15 - inset; x++)
+            {
+                bool rim = x == inset || x == 15 - inset || y == 13 || y == 6;
+                SetPixel(pixels, tile, x, y, rim ? edge : metal);
+            }
+        }
+        if (filled)
+        {
+            var water = new Color(58, 110, 216);
+            for (int y = 7; y <= 8; y++)
+                for (int x = 4; x <= 11; x++)
+                    SetPixel(pixels, tile, x, y, water);
+        }
+        // Handle: shallow arc over the brim.
+        SetPixel(pixels, tile, 3, 5, edge);
+        SetPixel(pixels, tile, 4, 4, edge);
+        SetPixel(pixels, tile, 5, 3, edge);
+        for (int x = 6; x <= 9; x++)
+            SetPixel(pixels, tile, x, 2, edge);
+        SetPixel(pixels, tile, 10, 3, edge);
+        SetPixel(pixels, tile, 11, 4, edge);
+        SetPixel(pixels, tile, 12, 5, edge);
+    }
+
     private static void DrawIngot(Color[] pixels, int tile, Color metal)
     {
         for (int y = 0; y < TileSize; y++)

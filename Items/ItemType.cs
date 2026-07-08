@@ -43,4 +43,6 @@ public enum ItemType : ushort
     IronPickaxe = 41,
     IronAxe = 42,
     IronShovel = 43,
+    Bucket = 44,
+    WaterBucket = 45,
 }

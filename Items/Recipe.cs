@@ -22,6 +22,7 @@ public static class Recipes
         new(new ItemStack(ItemType.IronPickaxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }),
         new(new ItemStack(ItemType.IronAxe, 1), new[] { (ItemType.IronIngot, 3), (ItemType.Stick, 2) }),
         new(new ItemStack(ItemType.IronShovel, 1), new[] { (ItemType.IronIngot, 1), (ItemType.Stick, 2) }),
+        new(new ItemStack(ItemType.Bucket, 1), new[] { (ItemType.IronIngot, 3) }),
     };
 
     /// <summary>Inputs available (room for the output is only checked by TryCraft).</summary>

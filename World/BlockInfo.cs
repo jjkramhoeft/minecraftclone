@@ -77,6 +77,8 @@ public static class BlockInfo
     public const int TileGlass = 45;
     public const int TileChestSide = 46;
     public const int TileChestFront = 47;
+    public const int TileBucket = 48;
+    public const int TileWaterBucket = 49;
 
     /// <summary>Solid blocks collide and cast ambient occlusion. Plants are
     /// deliberately NOT solid — you walk through them.</summary>

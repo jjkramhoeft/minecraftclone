@@ -17,13 +17,16 @@ public static class VoxelRaycaster
 {
     /// <param name="includeFlowers">False restricts hits to solid blocks —
     /// used by the third-person camera boom, which shouldn't stop at flowers.</param>
-    public static bool Cast(ChunkManager world, Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit hit, bool includeFlowers = true)
+    /// <param name="includeWater">True also stops at water cells — used by
+    /// buckets, which target the liquid itself.</param>
+    public static bool Cast(ChunkManager world, Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit hit, bool includeFlowers = true, bool includeWater = false)
     {
         int x = (int)MathF.Floor(origin.X);
         int y = (int)MathF.Floor(origin.Y);
         int z = (int)MathF.Floor(origin.Z);
 
-        bool Hits(BlockType type) => includeFlowers ? BlockInfo.IsTargetable(type) : BlockInfo.IsSolid(type);
+        bool Hits(BlockType type) => (includeWater && BlockInfo.IsWater(type))
+            || (includeFlowers ? BlockInfo.IsTargetable(type) : BlockInfo.IsSolid(type));
 
         // Degenerate but possible: the eye is inside a targetable block.
         if (Hits(world.GetBlock(x, y, z)))

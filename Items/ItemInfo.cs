@@ -20,7 +20,8 @@ public static class ItemInfo
 
     public static ItemType FromBlock(BlockType block) => (ItemType)(byte)block;
 
-    public static int MaxStack(ItemType item) => GetToolClass(item) == ToolClass.None ? 64 : 1;
+    public static int MaxStack(ItemType item) =>
+        item is ItemType.Bucket or ItemType.WaterBucket || GetToolClass(item) != ToolClass.None ? 1 : 64;
 
     public static ToolClass GetToolClass(ItemType item) => item switch
     {
@@ -79,6 +80,8 @@ public static class ItemInfo
             ItemType.IronShovel => BlockInfo.TileIronShovel,
             ItemType.Coal => BlockInfo.TileCoal,
             ItemType.IronIngot => BlockInfo.TileIronIngot,
+            ItemType.Bucket => BlockInfo.TileBucket,
+            ItemType.WaterBucket => BlockInfo.TileWaterBucket,
             _ => BlockInfo.TileDirt,
         };
     }
